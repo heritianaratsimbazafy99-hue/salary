@@ -17,12 +17,12 @@ grant usage on schema public to authenticated, service_role;
 grant select, insert, update on table public.agencies to authenticated;
 grant select on table public.profiles to authenticated;
 grant select, insert, update, delete on table public.agency_memberships to authenticated;
-grant select, insert, update on table public.employees to authenticated;
+grant select, insert on table public.employees to authenticated;
 grant select, insert, update on table public.payroll_imports to authenticated;
 grant select, insert, update on table public.payroll_import_rows to authenticated;
 grant select, insert on table public.payroll_import_errors to authenticated;
 grant select, insert, update on table public.column_mappings to authenticated;
-grant select, insert, update on table public.payslips to authenticated;
+grant select, insert on table public.payslips to authenticated;
 grant select, insert on table public.payslip_versions to authenticated;
 grant select on table public.audit_logs to authenticated;
 grant select on table public.notifications to authenticated;
@@ -91,7 +91,10 @@ create policy agencies_select_scoped on public.agencies
 for select to authenticated
 using (
   public.is_global_reader()
-  or id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and id = public.current_agency_id()
+  )
 );
 
 create policy agencies_insert_global_admin on public.agencies
@@ -134,7 +137,10 @@ create policy employees_select_scoped on public.employees
 for select to authenticated
 using (
   public.is_global_reader()
-  or agency_id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and agency_id = public.current_agency_id()
+  )
   or profile_id = public.current_profile_id()
 );
 
@@ -148,28 +154,14 @@ with check (
   or public.current_app_role() = 'super_admin'
 );
 
-create policy employees_update_manager_or_admin on public.employees
-for update to authenticated
-using (
-  (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
-  )
-  or public.current_app_role() = 'super_admin'
-)
-with check (
-  (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
-  )
-  or public.current_app_role() = 'super_admin'
-);
-
 create policy imports_select_scoped on public.payroll_imports
 for select to authenticated
 using (
   public.is_global_reader()
-  or agency_id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and agency_id = public.current_agency_id()
+  )
 );
 
 create policy imports_insert_manager on public.payroll_imports
@@ -195,7 +187,10 @@ create policy import_rows_select_scoped on public.payroll_import_rows
 for select to authenticated
 using (
   public.is_global_reader()
-  or agency_id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and agency_id = public.current_agency_id()
+  )
 );
 
 create policy import_rows_insert_manager on public.payroll_import_rows
@@ -206,7 +201,7 @@ with check (
   and exists (
     select 1
     from public.payroll_imports pi
-    where pi.id = import_id
+    where pi.id = payroll_import_rows.import_id
       and pi.agency_id = payroll_import_rows.agency_id
       and pi.uploaded_by = public.current_profile_id()
   )
@@ -217,10 +212,24 @@ for update to authenticated
 using (
   public.current_app_role() = 'agency_manager'
   and agency_id = public.current_agency_id()
+  and exists (
+    select 1
+    from public.payroll_imports pi
+    where pi.id = payroll_import_rows.import_id
+      and pi.agency_id = payroll_import_rows.agency_id
+      and pi.uploaded_by = public.current_profile_id()
+  )
 )
 with check (
   public.current_app_role() = 'agency_manager'
   and agency_id = public.current_agency_id()
+  and exists (
+    select 1
+    from public.payroll_imports pi
+    where pi.id = payroll_import_rows.import_id
+      and pi.agency_id = payroll_import_rows.agency_id
+      and pi.uploaded_by = public.current_profile_id()
+  )
 );
 
 create policy import_errors_select_scoped on public.payroll_import_errors
@@ -229,10 +238,13 @@ using (
   exists (
     select 1
     from public.payroll_imports pi
-    where pi.id = import_id
+    where pi.id = payroll_import_errors.import_id
       and (
         public.is_global_reader()
-        or pi.agency_id = public.current_agency_id()
+        or (
+          public.current_app_role() = 'agency_manager'
+          and pi.agency_id = public.current_agency_id()
+        )
       )
   )
 );
@@ -244,7 +256,7 @@ with check (
   and exists (
     select 1
     from public.payroll_imports pi
-    where pi.id = import_id
+    where pi.id = payroll_import_errors.import_id
       and pi.agency_id = public.current_agency_id()
       and pi.uploaded_by = public.current_profile_id()
   )
@@ -254,7 +266,10 @@ create policy mappings_select_scoped on public.column_mappings
 for select to authenticated
 using (
   public.is_global_reader()
-  or agency_id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and agency_id = public.current_agency_id()
+  )
 );
 
 create policy mappings_insert_manager on public.column_mappings
@@ -281,7 +296,10 @@ create policy payslips_select_scoped on public.payslips
 for select to authenticated
 using (
   public.is_global_reader()
-  or agency_id = public.current_agency_id()
+  or (
+    public.current_app_role() = 'agency_manager'
+    and agency_id = public.current_agency_id()
+  )
   or (
     current_version_id is not null
     and (expires_at is null or expires_at > now())
@@ -308,24 +326,6 @@ with check (
   )
 );
 
-create policy payslips_update_manager on public.payslips
-for update to authenticated
-using (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-)
-with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and published_by = public.current_profile_id()
-  and exists (
-    select 1
-    from public.employees e
-    where e.id = payslips.employee_id
-      and e.agency_id = payslips.agency_id
-  )
-);
-
 create policy payslip_versions_select_scoped on public.payslip_versions
 for select to authenticated
 using (
@@ -336,7 +336,10 @@ using (
     where p.id = payslip_versions.payslip_id
       and (
         public.is_global_reader()
-        or p.agency_id = public.current_agency_id()
+        or (
+          public.current_app_role() = 'agency_manager'
+          and p.agency_id = public.current_agency_id()
+        )
         or (
           p.current_version_id = payslip_versions.id
           and (p.expires_at is null or p.expires_at > now())

@@ -104,6 +104,7 @@ create table public.payroll_imports (
   unknown_employee_count integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint payroll_imports_id_agency_id_key unique (id, agency_id),
   check (period_end >= period_start),
   check (valid_row_count >= 0),
   check (invalid_row_count >= 0),
@@ -113,7 +114,7 @@ create table public.payroll_imports (
 
 create table public.payroll_import_rows (
   id uuid primary key default gen_random_uuid(),
-  import_id uuid not null references public.payroll_imports(id) on delete cascade,
+  import_id uuid not null,
   agency_id uuid not null references public.agencies(id) on delete cascade,
   employee_id text not null,
   employee_email text not null,
@@ -124,6 +125,8 @@ create table public.payroll_import_rows (
   has_manual_adjustments boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint payroll_import_rows_import_agency_fk
+    foreign key (import_id, agency_id) references public.payroll_imports(id, agency_id) on delete cascade,
   check (btrim(employee_id) <> ''),
   check (employee_email = lower(employee_email)),
   check (position('@' in employee_email) > 1),
@@ -190,6 +193,7 @@ create table public.payslip_versions (
   published_by uuid not null references public.profiles(id),
   replaced_at timestamptz,
   unique (payslip_id, version_number),
+  constraint payslip_versions_payslip_id_id_key unique (payslip_id, id),
   check (version_number > 0),
   check (jsonb_typeof(snapshot_data) = 'object'),
   check (jsonb_typeof(pay_items) = 'array'),
@@ -198,7 +202,7 @@ create table public.payslip_versions (
 
 alter table public.payslips
   add constraint payslips_current_version_fk
-  foreign key (current_version_id) references public.payslip_versions(id);
+  foreign key (id, current_version_id) references public.payslip_versions(payslip_id, id);
 
 create table public.audit_logs (
   id uuid primary key default gen_random_uuid(),
