@@ -176,6 +176,7 @@ create table public.payslips (
   published_by uuid not null references public.profiles(id),
   expires_at timestamptz,
   unique (agency_id, employee_id, period_start, period_end),
+  constraint payslips_id_agency_id_key unique (id, agency_id),
   constraint payslips_employee_agency_fk
     foreign key (employee_id, agency_id) references public.employees(id, agency_id) on delete cascade,
   check (period_end >= period_start),
@@ -184,8 +185,9 @@ create table public.payslips (
 
 create table public.payslip_versions (
   id uuid primary key default gen_random_uuid(),
-  payslip_id uuid not null references public.payslips(id) on delete cascade,
-  import_id uuid not null references public.payroll_imports(id),
+  payslip_id uuid not null,
+  import_id uuid not null,
+  agency_id uuid not null,
   version_number integer not null,
   snapshot_data jsonb not null,
   pay_items jsonb not null default '[]'::jsonb,
@@ -194,6 +196,10 @@ create table public.payslip_versions (
   replaced_at timestamptz,
   unique (payslip_id, version_number),
   constraint payslip_versions_payslip_id_id_key unique (payslip_id, id),
+  constraint payslip_versions_payslip_agency_fk
+    foreign key (payslip_id, agency_id) references public.payslips(id, agency_id) on delete cascade,
+  constraint payslip_versions_import_agency_fk
+    foreign key (import_id, agency_id) references public.payroll_imports(id, agency_id),
   check (version_number > 0),
   check (jsonb_typeof(snapshot_data) = 'object'),
   check (jsonb_typeof(pay_items) = 'array'),

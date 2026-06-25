@@ -150,7 +150,10 @@ using (
     public.current_app_role() = 'agency_manager'
     and agency_id = public.current_agency_id()
   )
-  or profile_id = public.current_profile_id()
+  or (
+    public.current_app_role() = 'employee'
+    and profile_id = public.current_profile_id()
+  )
 );
 
 create policy employees_insert_manager_or_admin on public.employees
@@ -310,7 +313,8 @@ using (
     and agency_id = public.current_agency_id()
   )
   or (
-    current_version_id is not null
+    public.current_app_role() = 'employee'
+    and current_version_id is not null
     and (expires_at is null or expires_at > now())
     and exists (
       select 1
@@ -343,6 +347,7 @@ using (
     from public.payslips p
     join public.employees e on e.id = p.employee_id
     where p.id = payslip_versions.payslip_id
+      and p.agency_id = payslip_versions.agency_id
       and (
         public.is_global_reader()
         or (
@@ -350,7 +355,8 @@ using (
           and p.agency_id = public.current_agency_id()
         )
         or (
-          p.current_version_id = payslip_versions.id
+          public.current_app_role() = 'employee'
+          and p.current_version_id = payslip_versions.id
           and (p.expires_at is null or p.expires_at > now())
           and e.profile_id = public.current_profile_id()
         )
@@ -362,14 +368,17 @@ create policy payslip_versions_insert_manager on public.payslip_versions
 for insert to authenticated
 with check (
   public.current_app_role() = 'agency_manager'
+  and agency_id = public.current_agency_id()
   and published_by = public.current_profile_id()
   and exists (
     select 1
     from public.payslips p
-    join public.payroll_imports pi on pi.id = payslip_versions.import_id
+    join public.payroll_imports pi
+      on pi.id = payslip_versions.import_id
+      and pi.agency_id = payslip_versions.agency_id
     where p.id = payslip_versions.payslip_id
+      and p.agency_id = payslip_versions.agency_id
       and p.agency_id = public.current_agency_id()
-      and pi.agency_id = p.agency_id
   )
 );
 

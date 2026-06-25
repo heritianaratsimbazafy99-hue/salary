@@ -6,7 +6,14 @@ const rlsMigrationSql = readFileSync("supabase/migrations/202606260002_rls_polic
   .replace(/\s+/g, " ")
   .toLowerCase();
 
+const coreSchemaSql = readFileSync("supabase/migrations/202606260001_core_schema.sql", "utf8")
+  .replace(/\s+/g, " ")
+  .toLowerCase();
+
 const authenticatedGrantStatements = rlsMigrationSql.match(/grant\s+[^;]+to\s+authenticated;/g) ?? [];
+const payslipVersionsTableSql = coreSchemaSql.match(
+  /create table public\.payslip_versions \((.*?)\); alter table public\.payslips/s,
+)?.[1] ?? "";
 
 type PolicyCase = {
   actorRole: string;
@@ -14,6 +21,7 @@ type PolicyCase = {
   actorAgencyId?: string;
   employeeAgencyId?: string;
   importAgencyId?: string;
+  versionAgencyId?: string;
   payslipId?: string;
   versionPayslipId?: string;
   ownerProfileId?: string;
@@ -26,6 +34,22 @@ function canSelectProfile(input: Pick<PolicyCase, "actorRole" | "actorProfileId"
     input.actorProfileId === input.ownerProfileId
     || input.actorRole === "hr_central"
     || input.actorRole === "super_admin"
+  );
+}
+
+function canSelectEmployeeOwnedBranch(input: Pick<PolicyCase, "actorRole" | "actorProfileId" | "ownerProfileId">): boolean {
+  return input.actorRole === "employee" && input.actorProfileId === input.ownerProfileId;
+}
+
+function canSelectEmployeeRecord(input: PolicyCase): boolean {
+  return (
+    input.actorRole === "hr_central"
+    || input.actorRole === "super_admin"
+    || (
+      input.actorRole === "agency_manager"
+      && input.actorAgencyId === input.resourceAgencyId
+    )
+    || canSelectEmployeeOwnedBranch(input)
   );
 }
 
@@ -69,8 +93,9 @@ function canCreatePayslipVersion(input: PolicyCase): boolean {
   return (
     input.actorRole === "agency_manager"
     && input.actorAgencyId === input.resourceAgencyId
+    && input.versionAgencyId === input.resourceAgencyId
     && input.importAgencyId !== undefined
-    && input.importAgencyId === input.resourceAgencyId
+    && input.importAgencyId === input.versionAgencyId
   );
 }
 
@@ -116,6 +141,30 @@ describe("RLS policy model", () => {
         expect.stringMatching(/\b(update|delete|truncate|trigger|references)\b/),
       ]),
     );
+  });
+
+  it("requires employee role on employee-owned SQL read branches", () => {
+    expect(rlsMigrationSql).toContain(
+      "or ( public.current_app_role() = 'employee' and profile_id = public.current_profile_id() )",
+    );
+    expect(rlsMigrationSql).toContain(
+      "or ( public.current_app_role() = 'employee' and current_version_id is not null",
+    );
+    expect(rlsMigrationSql).toContain(
+      "or ( public.current_app_role() = 'employee' and p.current_version_id = payslip_versions.id",
+    );
+  });
+
+  it("schema-constrains payslip versions to one agency across payslip and import", () => {
+    expect(coreSchemaSql).toContain("constraint payslips_id_agency_id_key unique (id, agency_id)");
+    expect(coreSchemaSql).toContain("agency_id uuid not null");
+    expect(coreSchemaSql).toContain(
+      "constraint payslip_versions_payslip_agency_fk foreign key (payslip_id, agency_id) references public.payslips(id, agency_id) on delete cascade",
+    );
+    expect(coreSchemaSql).toContain(
+      "constraint payslip_versions_import_agency_fk foreign key (import_id, agency_id) references public.payroll_imports(id, agency_id)",
+    );
+    expect(payslipVersionsTableSql).not.toContain("import_id uuid not null references public.payroll_imports(id)");
   });
 
   it("allows global readers to read profiles", () => {
@@ -301,5 +350,43 @@ describe("RLS policy model", () => {
     expect(canReadAuditLogs("super_admin")).toBe(true);
     expect(canReadAuditLogs("agency_manager")).toBe(false);
     expect(canReadAuditLogs("employee")).toBe(false);
+  });
+
+  it("denies non-employee roles the employee-owned branch even when profile-linked", () => {
+    expect(
+      canSelectEmployeeOwnedBranch({
+        actorRole: "agency_manager",
+        actorProfileId: "profile_linked",
+        ownerProfileId: "profile_linked",
+      }),
+    ).toBe(false);
+
+    expect(
+      canSelectEmployeeOwnedBranch({
+        actorRole: "hr_central",
+        actorProfileId: "profile_linked",
+        ownerProfileId: "profile_linked",
+      }),
+    ).toBe(false);
+
+    expect(
+      canSelectEmployeeOwnedBranch({
+        actorRole: "employee",
+        actorProfileId: "profile_linked",
+        ownerProfileId: "profile_linked",
+      }),
+    ).toBe(true);
+  });
+
+  it("denies a linked agency manager outside their agency through employee-owned employee access", () => {
+    expect(
+      canSelectEmployeeRecord({
+        actorRole: "agency_manager",
+        actorProfileId: "profile_linked_manager",
+        actorAgencyId: "agency_1",
+        ownerProfileId: "profile_linked_manager",
+        resourceAgencyId: "agency_2",
+      }),
+    ).toBe(false);
   });
 });
