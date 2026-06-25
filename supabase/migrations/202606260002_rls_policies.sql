@@ -103,9 +103,12 @@ for update to authenticated
 using (public.current_app_role() in ('hr_central', 'super_admin'))
 with check (public.current_app_role() in ('hr_central', 'super_admin'));
 
-create policy profiles_select_self on public.profiles
+create policy profiles_select_self_or_global on public.profiles
 for select to authenticated
-using (auth_user_id = (select auth.uid()));
+using (
+  auth_user_id = (select auth.uid())
+  or public.is_global_reader()
+);
 
 create policy memberships_select_scoped on public.agency_memberships
 for select to authenticated
@@ -285,7 +288,7 @@ using (
     and exists (
       select 1
       from public.employees e
-      where e.id = employee_id
+      where e.id = payslips.employee_id
         and e.profile_id = public.current_profile_id()
     )
   )
@@ -297,6 +300,12 @@ with check (
   public.current_app_role() = 'agency_manager'
   and agency_id = public.current_agency_id()
   and published_by = public.current_profile_id()
+  and exists (
+    select 1
+    from public.employees e
+    where e.id = payslips.employee_id
+      and e.agency_id = payslips.agency_id
+  )
 );
 
 create policy payslips_update_manager on public.payslips
@@ -309,6 +318,12 @@ with check (
   public.current_app_role() = 'agency_manager'
   and agency_id = public.current_agency_id()
   and published_by = public.current_profile_id()
+  and exists (
+    select 1
+    from public.employees e
+    where e.id = payslips.employee_id
+      and e.agency_id = payslips.agency_id
+  )
 );
 
 create policy payslip_versions_select_scoped on public.payslip_versions
@@ -318,7 +333,7 @@ using (
     select 1
     from public.payslips p
     join public.employees e on e.id = p.employee_id
-    where p.id = payslip_id
+    where p.id = payslip_versions.payslip_id
       and (
         public.is_global_reader()
         or p.agency_id = public.current_agency_id()
@@ -339,8 +354,10 @@ with check (
   and exists (
     select 1
     from public.payslips p
-    where p.id = payslip_id
+    join public.payroll_imports pi on pi.id = payslip_versions.import_id
+    where p.id = payslip_versions.payslip_id
       and p.agency_id = public.current_agency_id()
+      and pi.agency_id = p.agency_id
   )
 );
 

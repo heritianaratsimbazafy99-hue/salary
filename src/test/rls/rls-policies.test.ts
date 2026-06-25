@@ -4,10 +4,20 @@ type PolicyCase = {
   actorRole: string;
   resourceAgencyId: string;
   actorAgencyId?: string;
+  employeeAgencyId?: string;
+  importAgencyId?: string;
   ownerProfileId?: string;
   actorProfileId: string;
   isCurrentPublished?: boolean;
 };
+
+function canSelectProfile(input: Pick<PolicyCase, "actorRole" | "actorProfileId" | "ownerProfileId">): boolean {
+  return (
+    input.actorProfileId === input.ownerProfileId
+    || input.actorRole === "hr_central"
+    || input.actorRole === "super_admin"
+  );
+}
 
 function canSelectPayslip(input: PolicyCase): boolean {
   if (input.actorRole === "hr_central" || input.actorRole === "super_admin") return true;
@@ -20,7 +30,21 @@ function canSelectPayslip(input: PolicyCase): boolean {
 }
 
 function canPublish(input: PolicyCase): boolean {
-  return input.actorRole === "agency_manager" && input.actorAgencyId === input.resourceAgencyId;
+  return (
+    input.actorRole === "agency_manager"
+    && input.actorAgencyId === input.resourceAgencyId
+    && input.employeeAgencyId !== undefined
+    && input.employeeAgencyId === input.resourceAgencyId
+  );
+}
+
+function canCreatePayslipVersion(input: PolicyCase): boolean {
+  return (
+    input.actorRole === "agency_manager"
+    && input.actorAgencyId === input.resourceAgencyId
+    && input.importAgencyId !== undefined
+    && input.importAgencyId === input.resourceAgencyId
+  );
 }
 
 function canReadAuditLogs(actorRole: string): boolean {
@@ -28,6 +52,24 @@ function canReadAuditLogs(actorRole: string): boolean {
 }
 
 describe("RLS policy model", () => {
+  it("allows global readers to read profiles", () => {
+    expect(
+      canSelectProfile({
+        actorRole: "hr_central",
+        actorProfileId: "profile_hr",
+        ownerProfileId: "profile_employee_a",
+      }),
+    ).toBe(true);
+
+    expect(
+      canSelectProfile({
+        actorRole: "super_admin",
+        actorProfileId: "profile_admin",
+        ownerProfileId: "profile_employee_a",
+      }),
+    ).toBe(true);
+  });
+
   it("denies employee access to another employee payslip", () => {
     expect(
       canSelectPayslip({
@@ -70,6 +112,7 @@ describe("RLS policy model", () => {
         actorRole: "agency_manager",
         actorProfileId: "profile_manager",
         actorAgencyId: "agency_1",
+        employeeAgencyId: "agency_1",
         resourceAgencyId: "agency_2",
       }),
     ).toBe(false);
@@ -81,9 +124,22 @@ describe("RLS policy model", () => {
         actorRole: "agency_manager",
         actorProfileId: "profile_manager",
         actorAgencyId: "agency_1",
+        employeeAgencyId: "agency_1",
         resourceAgencyId: "agency_1",
       }),
     ).toBe(true);
+  });
+
+  it("denies manager publication when employee agency differs from payslip agency", () => {
+    expect(
+      canPublish({
+        actorRole: "agency_manager",
+        actorProfileId: "profile_manager",
+        actorAgencyId: "agency_1",
+        employeeAgencyId: "agency_2",
+        resourceAgencyId: "agency_1",
+      }),
+    ).toBe(false);
   });
 
   it("denies HR central publication", () => {
@@ -91,6 +147,18 @@ describe("RLS policy model", () => {
       canPublish({
         actorRole: "hr_central",
         actorProfileId: "profile_hr",
+        resourceAgencyId: "agency_1",
+      }),
+    ).toBe(false);
+  });
+
+  it("denies manager payslip version creation from another agency import", () => {
+    expect(
+      canCreatePayslipVersion({
+        actorRole: "agency_manager",
+        actorProfileId: "profile_manager",
+        actorAgencyId: "agency_1",
+        importAgencyId: "agency_2",
         resourceAgencyId: "agency_1",
       }),
     ).toBe(false);

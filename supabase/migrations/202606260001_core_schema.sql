@@ -84,6 +84,7 @@ create table public.employees (
   updated_at timestamptz not null default now(),
   unique (agency_id, employee_id),
   unique (agency_id, email),
+  constraint employees_id_agency_id_key unique (id, agency_id),
   check (email = lower(email)),
   check (position('@' in email) > 1),
   check (btrim(employee_id) <> ''),
@@ -164,7 +165,7 @@ create table public.column_mappings (
 create table public.payslips (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null references public.agencies(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
+  employee_id uuid not null,
   period_start date not null,
   period_end date not null,
   current_version_id uuid,
@@ -172,6 +173,8 @@ create table public.payslips (
   published_by uuid not null references public.profiles(id),
   expires_at timestamptz,
   unique (agency_id, employee_id, period_start, period_end),
+  constraint payslips_employee_agency_fk
+    foreign key (employee_id, agency_id) references public.employees(id, agency_id) on delete cascade,
   check (period_end >= period_start),
   check (expires_at is null or expires_at > published_at)
 );
