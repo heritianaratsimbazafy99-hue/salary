@@ -1,4 +1,12 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
+
+const rlsMigrationSql = readFileSync("supabase/migrations/202606260002_rls_policies.sql", "utf8")
+  .replace(/\s+/g, " ")
+  .toLowerCase();
+
+const authenticatedGrantStatements = rlsMigrationSql.match(/grant\s+[^;]+to\s+authenticated;/g) ?? [];
 
 type PolicyCase = {
   actorRole: string;
@@ -84,6 +92,32 @@ function canReadAuditLogs(actorRole: string): boolean {
 }
 
 describe("RLS policy model", () => {
+  it("revokes Supabase default table privileges before narrow authenticated grants", () => {
+    expect(rlsMigrationSql).toContain(
+      "revoke all privileges on all tables in schema public from anon, authenticated;",
+    );
+    expect(rlsMigrationSql).toContain(
+      "alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;",
+    );
+  });
+
+  it("keeps authenticated grants narrow for employee and payslip tables", () => {
+    expect(rlsMigrationSql).toContain("grant select, insert on table public.employees to authenticated;");
+    expect(rlsMigrationSql).toContain("grant select, insert on table public.payslips to authenticated;");
+    expect(rlsMigrationSql).toContain("grant select, insert on table public.payslip_versions to authenticated;");
+
+    const reviewedTableGrantStatements = authenticatedGrantStatements.filter((statement) =>
+      /\bpublic\.(employees|payslips|payslip_versions)\b/.test(statement),
+    );
+
+    expect(reviewedTableGrantStatements).toHaveLength(3);
+    expect(reviewedTableGrantStatements).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\b(update|delete|truncate|trigger|references)\b/),
+      ]),
+    );
+  });
+
   it("allows global readers to read profiles", () => {
     expect(
       canSelectProfile({

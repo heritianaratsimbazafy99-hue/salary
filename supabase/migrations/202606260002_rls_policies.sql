@@ -12,6 +12,15 @@ alter table public.audit_logs enable row level security;
 alter table public.notifications enable row level security;
 alter table public.export_jobs enable row level security;
 
+revoke all privileges on all tables in schema public from anon, authenticated;
+revoke all privileges on all sequences in schema public from anon, authenticated;
+
+alter default privileges for role postgres in schema public
+revoke all on tables from anon, authenticated;
+
+alter default privileges for role postgres in schema public
+revoke all on sequences from anon, authenticated;
+
 grant usage on schema public to authenticated, service_role;
 
 grant select, insert, update on table public.agencies to authenticated;
