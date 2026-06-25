@@ -272,6 +272,7 @@ export type PayrollRowError = {
 - Create: `src/lib/env.public.ts`
 - Create: `src/lib/env.server.ts`
 - Create: `src/lib/env.ts`
+- Create: `src/test/unit/scaffold.test.ts`
 - Create: `.env.example`
 - Create: `.gitignore`
 
@@ -454,19 +455,6 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
-  theme: {
-    extend: {
-      colors: {
-        border: "hsl(var(--border))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        muted: "hsl(var(--muted))",
-        "muted-foreground": "hsl(var(--muted-foreground))",
-        primary: "hsl(var(--primary))",
-        "primary-foreground": "hsl(var(--primary-foreground))",
-      },
-    },
-  },
   plugins: [],
 };
 
@@ -509,6 +497,7 @@ out
 coverage
 playwright-report
 test-results
+*.tsbuildinfo
 .env
 .env.local
 .env.*.local
@@ -607,6 +596,8 @@ Use this `src/app/globals.css`:
 ```css
 @import "tailwindcss";
 
+@source inline("{bg-background,text-foreground,text-muted-foreground,bg-primary,text-primary-foreground,border-border}");
+
 :root {
   --background: 0 0% 100%;
   --foreground: 222 47% 11%;
@@ -615,6 +606,16 @@ Use this `src/app/globals.css`:
   --border: 214 32% 91%;
   --primary: 173 80% 30%;
   --primary-foreground: 0 0% 100%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
 }
 
 body {
@@ -644,7 +645,7 @@ Expected:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add package.json package-lock.json next.config.ts tsconfig.json next-env.d.ts vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.public.ts src/lib/env.server.ts src/lib/env.ts
+git add package.json package-lock.json next.config.ts tsconfig.json next-env.d.ts vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.public.ts src/lib/env.server.ts src/lib/env.ts src/test/unit/scaffold.test.ts
 git commit -m "chore: scaffold payroll platform app"
 ```
 
