@@ -24,7 +24,7 @@
     "react-dom": "latest",
     "resend": "latest",
     "tailwind-merge": "latest",
-    "xlsx": "latest",
+    "exceljs": "latest",
     "zod": "latest"
   },
   "devDependencies": {

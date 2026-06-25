@@ -6,7 +6,7 @@
 
 **Architecture:** The app is a Next.js App Router application deployed on Vercel, backed by Supabase Auth, Supabase Postgres, RLS, and Resend. The implementation is split into secure core tasks first, then isolated export and analytics modules. Excel files are parsed server-side, converted to structured database records, and discarded after analysis.
 
-**Tech Stack:** Next.js App Router, TypeScript, Supabase Auth/Postgres/RLS, Vercel, Resend, Tailwind CSS, shadcn/ui-style components, Zod, Vitest, Playwright, xlsx.
+**Tech Stack:** Next.js App Router, TypeScript, Supabase Auth/Postgres/RLS, Vercel, Resend, Tailwind CSS, shadcn/ui-style components, Zod, Vitest, Playwright, exceljs.
 
 ---
 
@@ -301,7 +301,7 @@ Use this `package.json`:
     "react-dom": "latest",
     "resend": "latest",
     "tailwind-merge": "latest",
-    "xlsx": "latest",
+    "exceljs": "latest",
     "zod": "latest"
   },
   "devDependencies": {
