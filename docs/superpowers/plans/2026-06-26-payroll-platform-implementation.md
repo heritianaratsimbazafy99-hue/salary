@@ -260,6 +260,7 @@ export type PayrollRowError = {
 - Create: `package.json`
 - Create: `next.config.ts`
 - Create: `tsconfig.json`
+- Create: `next-env.d.ts`
 - Create: `vitest.config.ts`
 - Create: `playwright.config.ts`
 - Create: `eslint.config.mjs`
@@ -355,13 +356,24 @@ Use this `tsconfig.json`:
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
 ```
@@ -373,6 +385,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  turbopack: {
+    // Avoid parent-lockfile root inference when this repo lives under a home directory with another lockfile.
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;
@@ -628,7 +644,7 @@ Expected:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.public.ts src/lib/env.server.ts src/lib/env.ts
+git add package.json package-lock.json next.config.ts tsconfig.json next-env.d.ts vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.public.ts src/lib/env.server.ts src/lib/env.ts
 git commit -m "chore: scaffold payroll platform app"
 ```
 
