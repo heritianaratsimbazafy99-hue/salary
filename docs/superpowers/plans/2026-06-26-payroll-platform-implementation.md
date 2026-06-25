@@ -123,6 +123,8 @@ Create and maintain these areas:
 │   │   ├── audit/AuditLogTable.tsx
 │   │   └── analytics/PayrollAnalytics.tsx
 │   ├── lib/
+│   │   ├── env.public.ts
+│   │   ├── env.server.ts
 │   │   ├── env.ts
 │   │   ├── roles.ts
 │   │   ├── errors.ts
@@ -266,6 +268,8 @@ export type PayrollRowError = {
 - Create: `src/app/layout.tsx`
 - Create: `src/app/page.tsx`
 - Create: `src/app/globals.css`
+- Create: `src/lib/env.public.ts`
+- Create: `src/lib/env.server.ts`
 - Create: `src/lib/env.ts`
 - Create: `.env.example`
 - Create: `.gitignore`
@@ -291,33 +295,34 @@ Use this `package.json`:
     "verify": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
-    "@supabase/ssr": "latest",
-    "@supabase/supabase-js": "latest",
-    "class-variance-authority": "latest",
-    "clsx": "latest",
-    "lucide-react": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "resend": "latest",
-    "tailwind-merge": "latest",
-    "exceljs": "latest",
-    "zod": "latest"
+    "@supabase/ssr": "0.12.0",
+    "@supabase/supabase-js": "2.108.2",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.21.0",
+    "next": "16.2.9",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "resend": "6.14.0",
+    "tailwind-merge": "3.6.0",
+    "exceljs": "4.4.0",
+    "server-only": "0.0.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@playwright/test": "latest",
-    "@tailwindcss/postcss": "latest",
-    "@testing-library/jest-dom": "latest",
-    "@testing-library/react": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
-    "jsdom": "latest",
-    "tailwindcss": "latest",
-    "typescript": "latest",
-    "vitest": "latest"
+    "@playwright/test": "1.61.1",
+    "@tailwindcss/postcss": "4.3.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "26.0.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.9",
+    "jsdom": "29.1.1",
+    "tailwindcss": "4.3.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
   }
 }
 ```
@@ -495,7 +500,7 @@ test-results
 *.key
 ```
 
-Use this `src/lib/env.ts`:
+Use this `src/lib/env.public.ts`:
 
 ```ts
 import { z } from "zod";
@@ -506,24 +511,41 @@ const PublicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 
-const ServerEnvSchema = PublicEnvSchema.extend({
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
-  RESEND_FROM_EMAIL: z.string().min(1).default("Paie Interne <no-reply@example.com>"),
-});
-
 export const publicEnv = PublicEnvSchema.parse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
+```
 
-export const serverEnv = ServerEnvSchema.parse({
-  ...publicEnv,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
-  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+Use this `src/lib/env.server.ts`:
+
+```ts
+import "server-only";
+
+import { z } from "zod";
+import { publicEnv } from "./env.public";
+
+const ServerOnlyEnvSchema = z.object({
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: z.string().min(1).default("Paie Interne <no-reply@example.com>"),
 });
+
+export const serverEnv = {
+  ...publicEnv,
+  ...ServerOnlyEnvSchema.parse({
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+  }),
+};
+```
+
+Use this `src/lib/env.ts`:
+
+```ts
+export { publicEnv } from "./env.public";
 ```
 
 Use this `src/app/layout.tsx`:
@@ -606,7 +628,7 @@ Expected:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.ts
+git add package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts playwright.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.ts .env.example .gitignore src/app src/lib/env.public.ts src/lib/env.server.ts src/lib/env.ts
 git commit -m "chore: scaffold payroll platform app"
 ```
 
@@ -1240,7 +1262,7 @@ Create `src/lib/supabase/browser.ts`:
 
 ```ts
 import { createBrowserClient } from "@supabase/ssr";
-import { publicEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
 
 export function createClient() {
   return createBrowserClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -1252,7 +1274,7 @@ Create `src/lib/supabase/server.ts`:
 ```ts
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { publicEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -1276,7 +1298,8 @@ Create `src/lib/supabase/admin.ts`:
 
 ```ts
 import { createClient } from "@supabase/supabase-js";
-import { publicEnv, serverEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
+import { serverEnv } from "@/lib/env.server";
 
 export function createAdminClient() {
   if (!serverEnv.SUPABASE_SERVICE_ROLE_KEY) {
@@ -1294,7 +1317,7 @@ export function createAdminClient() {
 Create `src/app/auth/login/page.tsx`:
 
 ```tsx
-import { publicEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
 import { createClient } from "@/lib/supabase/server";
 
 async function signIn(formData: FormData) {
@@ -2818,7 +2841,8 @@ Create `src/lib/notifications/resend.ts`:
 
 ```ts
 import { Resend } from "resend";
-import { publicEnv, serverEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
+import { serverEnv } from "@/lib/env.server";
 
 export function buildPayslipPublishedEmail(input: { employeeName: string; appUrl: string }) {
   return {
@@ -2859,7 +2883,7 @@ Create `src/app/api/notifications/test/route.ts`:
 
 ```ts
 import { apiError } from "@/lib/errors";
-import { publicEnv } from "@/lib/env";
+import { publicEnv } from "@/lib/env.public";
 import { buildPayslipPublishedEmail } from "@/lib/notifications/resend";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
