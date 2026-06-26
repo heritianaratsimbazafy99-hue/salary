@@ -72,12 +72,25 @@ describe("POST /api/imports/:importId/publish", () => {
     });
   });
 
-  it("returns published metadata for an authenticated valid request", async () => {
+  it("returns 422 and VALIDATION_ERROR when the import id is whitespace only", async () => {
     supabaseMocks.createClient.mockResolvedValue(
       createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }),
     );
 
-    const response = await POST(createPublishRequest(), createPublishContext("import-001"));
+    const response = await POST(createPublishRequest(), createPublishContext("   "));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+  });
+
+  it("returns published metadata with a normalized import id for an authenticated valid request", async () => {
+    supabaseMocks.createClient.mockResolvedValue(
+      createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }),
+    );
+
+    const response = await POST(createPublishRequest(), createPublishContext("  import-001  "));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
