@@ -6,7 +6,9 @@ import {
   AUTH_REQUIRED_ERROR_MESSAGE,
   FORBIDDEN_ERROR_MESSAGE,
 } from "@/lib/admin/permissions";
+import { loadPayrollAnalyticsRows } from "@/lib/analytics/queries";
 import { recordAuditEvent } from "@/lib/audit/server";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,9 @@ export default async function AnalyticsPage() {
     throw error;
   }
 
+  const supabase = await createClient();
+  const rows = await loadPayrollAnalyticsRows(supabase);
+
   await recordAuditEvent({
     action: "ANALYTICS_VIEWED",
     actorProfileId: actor.id,
@@ -40,7 +45,7 @@ export default async function AnalyticsPage() {
         <h1 className="text-2xl font-semibold">Analytics paie</h1>
         <p className="text-sm text-muted-foreground">Analyse detaillee des donnees de paie publiees.</p>
       </div>
-      <PayrollAnalytics rows={[]} />
+      <PayrollAnalytics rows={rows} />
     </main>
   );
 }
