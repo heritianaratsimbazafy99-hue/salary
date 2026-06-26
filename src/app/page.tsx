@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
-  BadgeCheck,
   Building2,
   Clock,
   Download,
@@ -17,6 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { HeroShowcase } from "@/components/marketing/HeroShowcase";
 import { Reveal } from "@/components/marketing/Reveal";
 
 const STEPS: Array<{ title: string; description: string; icon: LucideIcon }> = [
@@ -211,97 +211,10 @@ function Hero() {
         </div>
 
         <Reveal delay={120} className="relative">
-          <PayslipPreview />
+          <HeroShowcase />
         </Reveal>
       </div>
     </section>
-  );
-}
-
-/** Authentic employee payslip card — what users actually see after login. */
-function PayslipPreview() {
-  const lines: Array<[string, string, "pos" | "neg"]> = [
-    ["Salaire de base", "1 250 000", "pos"],
-    ["Prime d'ancienneté", "85 000", "pos"],
-    ["Cotisations sociales", "− 142 000", "neg"],
-    ["Impôt sur le revenu", "− 96 500", "neg"],
-  ];
-
-  return (
-    <div className="relative mx-auto w-full max-w-md">
-      {/* Floating status badge */}
-      <div className="animate-float absolute -right-3 -top-4 z-10 hidden items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold shadow-[var(--shadow-md)] sm:flex">
-        <span className="pulse-dot inline-block size-2 rounded-full bg-success" aria-hidden="true" />
-        Nouvelle fiche publiée
-      </div>
-
-      <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-lg)]">
-        <div className="flex items-center justify-between gap-4 bg-ink px-6 py-5 text-ink-foreground">
-          <div>
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-ink-muted">
-              Fiche de paie
-            </p>
-            <p className="mt-1 font-display text-lg font-semibold">Juin 2026</p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-            <BadgeCheck className="size-3.5" aria-hidden="true" />
-            Publiée
-          </span>
-        </div>
-
-        <div className="space-y-px bg-border/60">
-          {lines.map(([label, amount, tone]) => (
-            <div
-              className="flex items-center justify-between bg-surface px-6 py-3.5 text-sm"
-              key={label}
-            >
-              <span className="text-muted-foreground">{label}</span>
-              <span
-                className={`font-medium tabular-nums ${tone === "neg" ? "text-danger" : "text-foreground"}`}
-              >
-                {amount}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between gap-4 border-t border-border bg-surface-elevated px-6 py-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Net à payer
-            </p>
-            <p className="mt-1 font-display text-2xl font-bold tabular-nums text-foreground">
-              1 096 500 <span className="text-sm font-medium text-muted-foreground">MGA</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground shadow-[var(--shadow-xs)]"
-          >
-            <Download className="size-4 text-primary" aria-hidden="true" />
-            PDF
-          </button>
-        </div>
-      </article>
-
-      {/* History hint card behind */}
-      <div className="animate-float absolute -bottom-5 -left-4 z-[-1] hidden w-44 rounded-xl border border-border bg-surface/95 p-3 shadow-[var(--shadow-md)] [animation-delay:1.2s] sm:block">
-        <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-          <History className="size-4 text-primary" aria-hidden="true" />
-          Historique
-        </div>
-        <div className="mt-2 space-y-1.5">
-          {["Mai 2026", "Avril 2026", "Mars 2026"].map((m) => (
-            <div className="flex items-center justify-between text-[0.7rem] text-muted-foreground" key={m}>
-              <span>{m}</span>
-              <BadgeCheck className="size-3 text-success" aria-hidden="true" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 

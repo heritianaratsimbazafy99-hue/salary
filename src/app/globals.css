@@ -163,6 +163,107 @@ body {
   );
 }
 
+/* ----------------------------------------------------------------------------
+   Hero showcase — self-playing demo of the employee journey
+---------------------------------------------------------------------------- */
+@keyframes salary-scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes salary-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes salary-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes salary-scan {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  18%,
+  82% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+}
+
+@keyframes salary-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 9px hsl(var(--primary) / 0.14);
+  }
+}
+
+@keyframes salary-count {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes salary-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.hero-scene {
+  animation: salary-scene-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-line {
+  animation: salary-line-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-progress {
+  transform-origin: left;
+  animation: salary-progress 3.6s linear both;
+}
+.hero-scan {
+  animation: salary-scan 3.6s ease-in-out infinite;
+}
+.hero-glow {
+  animation: salary-glow 2.2s ease-in-out infinite;
+}
+.hero-count {
+  animation: salary-count 0.6s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: salary-ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -176,7 +277,22 @@ body {
 
   .animate-float,
   .animate-rise,
-  .pulse-dot {
+  .pulse-dot,
+  .hero-scene,
+  .hero-line,
+  .hero-progress,
+  .hero-scan,
+  .hero-glow,
+  .hero-count,
+  .hero-ring {
     animation: none !important;
+  }
+
+  .hero-progress {
+    transform: scaleX(1);
+  }
+
+  .hero-ring {
+    stroke-dashoffset: 0;
   }
 }
