@@ -16,9 +16,9 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Salary | Vos fiches de paie, en clair et en sécurité",
+  title: "MadajobPay | Vos fiches de paie, en clair et en sécurité",
   description:
-    "Salary donne aux salariés un accès simple et sécurisé à leurs fiches de paie : connexion par lien magique, historique complet, confidentialité garantie.",
+    "MadajobPay donne aux salariés un accès simple et sécurisé à leurs fiches de paie : connexion par lien magique, historique complet, confidentialité garantie.",
 };
 
 // Flag the document as JS-enabled before paint so reveal animations only hide

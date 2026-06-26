@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Reveal } from "@/components/marketing/Reveal";
 
 import { buildMagicLinkOtpOptions } from "@/lib/auth/magic-link";
@@ -139,7 +140,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="absolute -bottom-16 right-0 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
           </div>
 
-          <div className="relative">
+          <div className="relative flex items-center justify-between gap-4">
+            <BrandLogo inverted markSize={36} priority />
             <Link
               className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink-foreground"
               href="/"
@@ -191,11 +193,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               Accueil
             </Link>
 
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary font-display text-base font-bold text-primary-foreground shadow-[var(--shadow-sm)]">
-              S
-            </span>
+            <BrandLogo markOnly href={null} markSize={44} priority />
             <h2 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              Connexion à Salary
+              Connexion à MadajobPay
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Saisissez votre adresse professionnelle. Nous vous envoyons un lien de connexion

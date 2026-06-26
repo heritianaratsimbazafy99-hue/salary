@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -14,8 +13,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
+
 /**
- * Self-playing showcase of the employee journey on Salary. Four scenes auto-
+ * Self-playing showcase of the employee journey on MadajobPay. Four scenes auto-
  * advance on a loop, each demonstrating one feature an employee actually uses:
  * passwordless login, a readable payslip, the full history, and PDF download.
  *
@@ -111,7 +112,7 @@ export function HeroShowcase() {
 
       {/* Device window */}
       <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-lg)]">
-        {/* Title bar — Salary space + MADAjob employer mark */}
+        {/* Title bar — MadajobPay employee space */}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="flex gap-1.5" aria-hidden="true">
@@ -119,14 +120,9 @@ export function HeroShowcase() {
               <span className="size-2.5 rounded-full bg-warning/70" />
               <span className="size-2.5 rounded-full bg-success/70" />
             </span>
-            <span className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-lg bg-primary font-display text-[0.7rem] font-bold text-primary-foreground">
-                S
-              </span>
-              <span className="text-xs font-semibold text-foreground">Espace salarié</span>
-            </span>
+            <span className="text-xs font-semibold text-muted-foreground">Espace salarié</span>
           </div>
-          <EmployerMark />
+          <BrandLogo href={null} markSize={24} />
         </div>
 
         {/* Scene stage */}
@@ -195,25 +191,6 @@ export function HeroShowcase() {
         })}
       </div>
     </div>
-  );
-}
-
-/** White-chipped MADAjob lockup — the employee's employer on Salary. */
-function EmployerMark() {
-  return (
-    <span className="flex items-center gap-2 rounded-lg border border-border bg-white px-2 py-1 shadow-[var(--shadow-xs)]">
-      <span className="text-[0.55rem] font-semibold uppercase tracking-wide text-muted-foreground">
-        Employeur
-      </span>
-      <Image
-        src="/madajob-logo.png"
-        alt="MADAjob"
-        width={88}
-        height={81}
-        priority
-        className="h-6 w-auto"
-      />
-    </span>
   );
 }
 

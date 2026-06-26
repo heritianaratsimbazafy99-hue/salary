@@ -16,6 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { HeroShowcase } from "@/components/marketing/HeroShowcase";
 import { Reveal } from "@/components/marketing/Reveal";
 
@@ -101,27 +102,11 @@ export default function HomePage() {
   );
 }
 
-function Logo({ subtitle = true }: { subtitle?: boolean }) {
-  return (
-    <Link className="group flex items-center gap-3" href="/" aria-label="Salary — accueil">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-primary font-display text-base font-bold text-primary-foreground shadow-[var(--shadow-sm)] transition-transform duration-300 group-hover:-translate-y-0.5">
-        S
-      </span>
-      <span className="leading-tight">
-        <span className="block font-display text-sm font-semibold tracking-tight">Salary</span>
-        {subtitle ? (
-          <span className="block text-xs text-muted-foreground">Espace salarié</span>
-        ) : null}
-      </span>
-    </Link>
-  );
-}
-
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-6">
-        <Logo />
+        <BrandLogo subtitle="Espace salarié" priority />
         <nav
           aria-label="Sections"
           className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex"
@@ -179,7 +164,7 @@ function Hero() {
             et en sécurité.
           </Reveal>
           <Reveal as="p" delay={120} className="mt-6 max-w-xl text-base leading-7 text-muted-foreground md:text-lg">
-            Salary réunit toutes vos fiches de paie dans un espace personnel et confidentiel.
+            MadajobPay réunit toutes vos fiches de paie dans un espace personnel et confidentiel.
             Connectez-vous d&apos;un clic, consultez la dernière fiche et parcourez tout votre
             historique — sans mot de passe, sans paperasse.
           </Reveal>
@@ -296,7 +281,7 @@ function SecuritySection() {
                 Vos données restent les vôtres.
               </Reveal>
               <Reveal as="p" delay={120} className="mt-4 text-base leading-7 text-ink-muted">
-                La paie touche à ce qu&apos;il y a de plus personnel. Salary est construit autour
+                La paie touche à ce qu&apos;il y a de plus personnel. MadajobPay est construit autour
                 d&apos;un principe simple : chacun ne voit que ce qui le concerne.
               </Reveal>
             </div>
@@ -447,7 +432,7 @@ function SiteFooter() {
   return (
     <footer className="border-t border-border bg-surface px-5 py-10 sm:px-6">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
-        <Logo subtitle={false} />
+        <BrandLogo />
         <p className="text-center text-xs text-muted-foreground sm:text-right">
           Plateforme interne de fiches de paie. Accès réservé aux collaborateurs invités.
         </p>
