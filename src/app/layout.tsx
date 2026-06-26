@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Plateforme paie interne",
-  description: "Gestion interne des fiches de paie web",
+  title: "Salary | Plateforme paie interne",
+  description: "Imports, validation, publication et consultation securisee des fiches de paie.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

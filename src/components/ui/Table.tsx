@@ -6,7 +6,7 @@ function joinClasses(...classes: Array<string | undefined>) {
 
 export function Table({ className, ...props }: ComponentPropsWithoutRef<"table">) {
   return (
-    <div className="w-full overflow-x-auto rounded-md border border-border">
+    <div className="w-full overflow-x-auto rounded-lg border border-border bg-surface shadow-sm">
       <table
         className={joinClasses("min-w-full border-collapse text-left text-sm", className)}
         {...props}
@@ -16,7 +16,7 @@ export function Table({ className, ...props }: ComponentPropsWithoutRef<"table">
 }
 
 export function TableHeader(props: ComponentPropsWithoutRef<"thead">) {
-  return <thead className="bg-muted text-xs uppercase text-muted-foreground" {...props} />;
+  return <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground" {...props} />;
 }
 
 export function TableBody(props: ComponentPropsWithoutRef<"tbody">) {
