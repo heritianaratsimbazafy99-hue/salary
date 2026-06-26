@@ -1,0 +1,29 @@
+import type { ReactNode } from "react";
+
+type PageHeaderProps = {
+  eyebrow?: string;
+  title: string;
+  description?: ReactNode;
+  /** Optional actions rendered on the right of the title row (desktop). */
+  actions?: ReactNode;
+};
+
+/** Consistent page-level header used across the internal app surfaces. */
+export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
+  return (
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        {eyebrow ? <p className="text-sm font-semibold text-primary">{eyebrow}</p> : null}
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          {title}
+        </h1>
+        {description ? (
+          <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+    </header>
+  );
+}

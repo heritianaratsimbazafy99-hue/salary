@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
+import { FileText } from "lucide-react";
 
 import { PayslipView } from "@/components/payslips/PayslipView";
+import { AccessDenied } from "@/components/shell/AccessDenied";
+import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/shell/PageHeader";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
   FORBIDDEN_ERROR_MESSAGE,
@@ -29,37 +33,36 @@ export default async function EmployeePayslipsPage() {
   }
 
   return (
-    <main className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Mes fiches de paie</h1>
-        <p className="text-sm text-muted-foreground">Consultez vos fiches internes publiees.</p>
+    <AppShell role="employee">
+      <div className="mx-auto max-w-3xl space-y-8">
+        <PageHeader
+          eyebrow="Espace salarié"
+          title="Mes fiches de paie"
+          description="Consultez et téléchargez vos fiches internes publiées."
+        />
+        {payslip ? <PayslipView {...payslip} /> : <EmptyPayslipState />}
       </div>
-      {payslip ? <PayslipView {...payslip} /> : <EmptyPayslipState />}
-    </main>
+    </AppShell>
   );
 }
 
 function EmptyPayslipState() {
   return (
-    <section className="rounded border border-border p-6">
-      <h2 className="text-xl font-semibold">Aucune fiche publiee</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Aucune fiche de paie publiee n&apos;est disponible pour votre compte.
+    <section className="rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
+      <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <FileText className="size-6" aria-hidden="true" />
+      </span>
+      <h2 className="mt-5 font-display text-lg font-semibold">Aucune fiche publiée</h2>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+        Aucune fiche de paie publiee n&apos;est disponible pour votre compte. Vous serez notifié
+        dès qu&apos;une nouvelle fiche sera prête.
       </p>
     </section>
   );
 }
 
 function ForbiddenEmployeeAccess() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-10">
-      <p className="text-sm font-medium text-muted-foreground">Espace salarie</p>
-      <h1 className="mt-3 text-2xl font-semibold">Acces refuse</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Votre role ne permet pas d&apos;ouvrir cette page.
-      </p>
-    </main>
-  );
+  return <AccessDenied context="Espace salarié" />;
 }
 
 function hasErrorMessage(error: unknown, message: string): error is Error {

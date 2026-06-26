@@ -1,7 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Lock, Mail, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Fingerprint,
+  History,
+  Lock,
+  Mail,
+} from "lucide-react";
 import { z } from "zod";
+
+import { Reveal } from "@/components/marketing/Reveal";
 
 import { buildMagicLinkOtpOptions } from "@/lib/auth/magic-link";
 import { getPublicSupabaseConfig } from "@/lib/env.public";
@@ -95,91 +107,158 @@ async function requestMagicLink(formData: FormData) {
   redirect("/auth/login?sent=1");
 }
 
+const REASSURANCE: Array<{ title: string; description: string; icon: typeof Lock }> = [
+  {
+    title: "Sans mot de passe",
+    description: "Un lien à usage unique, lié à votre adresse — rien à mémoriser.",
+    icon: Fingerprint,
+  },
+  {
+    title: "Strictement privé",
+    description: "Vous n'accédez qu'à vos propres fiches de paie.",
+    icon: Lock,
+  },
+  {
+    title: "Historique complet",
+    description: "Toutes vos fiches publiées, classées par période.",
+    icon: History,
+  },
+];
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = searchParams ? await searchParams : {};
   const message = resolveMessage(params);
 
   return (
-    <main className="min-h-screen bg-background px-5 py-6 text-foreground md:py-10">
-      <section className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <aside className="rounded-lg border border-border bg-foreground p-6 text-primary-foreground shadow-sm md:p-8">
-          <Link
-            className="inline-flex items-center gap-2 text-sm font-medium text-primary-foreground/75 hover:text-primary-foreground"
-            href="/"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Retour accueil
-          </Link>
-          <div className="mt-12 max-w-lg">
-            <span className="inline-flex size-11 items-center justify-center rounded-md bg-accent text-accent-foreground">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </span>
-            <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-accent">Connexion securisee</p>
-            <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-5xl">
-              Acces par lien magique, sans mot de passe a retenir.
-            </h1>
-            <p className="mt-5 text-sm leading-6 text-primary-foreground/75">
-              Le lien ouvre votre espace selon votre role: manager d&apos;agence, RH centrale, super admin ou salarie.
-            </p>
+    <main className="min-h-dvh bg-background px-4 py-6 text-foreground sm:px-6 md:py-10">
+      <section className="mx-auto grid min-h-[calc(100dvh-4.5rem)] max-w-6xl items-stretch gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-8">
+        {/* Brand / reassurance panel */}
+        <aside className="relative hidden overflow-hidden rounded-3xl border border-ink/30 bg-ink p-8 text-ink-foreground shadow-[var(--shadow-lg)] lg:flex lg:flex-col">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-16 -top-10 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
+            <div className="absolute -bottom-16 right-0 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
           </div>
-          <div className="mt-10 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded-md bg-primary-foreground/10 p-4">
-              <Lock className="size-4 text-accent" aria-hidden="true" />
-              <p className="mt-3 font-semibold">Session controlee</p>
-              <p className="mt-1 text-primary-foreground/65">Acces lie a votre adresse professionnelle.</p>
-            </div>
-            <div className="rounded-md bg-primary-foreground/10 p-4">
-              <Mail className="size-4 text-accent" aria-hidden="true" />
-              <p className="mt-3 font-semibold">Email unique</p>
-              <p className="mt-1 text-primary-foreground/65">Un nouveau lien peut etre genere a chaque connexion.</p>
-            </div>
+
+          <div className="relative">
+            <Link
+              className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink-foreground"
+              href="/"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Retour à l&apos;accueil
+            </Link>
+          </div>
+
+          <div className="relative mt-auto max-w-md">
+            <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground shadow-[var(--shadow-sm)]">
+              <Mail className="size-6" aria-hidden="true" />
+            </span>
+            <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-accent">
+              Espace salarié
+            </p>
+            <h1 className="mt-3 font-display text-3xl font-bold leading-tight md:text-4xl">
+              Un lien dans votre boîte mail, et vous y êtes.
+            </h1>
+            <p className="mt-5 text-sm leading-6 text-ink-muted">
+              La connexion par lien magique ouvre votre espace personnel selon votre rôle — salarié,
+              manager d&apos;agence ou RH centrale.
+            </p>
+
+            <ul className="mt-9 space-y-3">
+              {REASSURANCE.map((item) => (
+                <li className="flex items-start gap-3" key={item.title}>
+                  <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-ink-foreground/[0.06] text-accent">
+                    <item.icon className="size-4" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold">{item.title}</span>
+                    <span className="block text-sm text-ink-muted">{item.description}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </aside>
 
-        <div className="mx-auto w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-xl shadow-foreground/5 md:p-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">Salary</p>
-          <h2 className="mt-3 text-3xl font-semibold">Connexion</h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Recevez un lien de connexion securise sur votre adresse professionnelle.
-          </p>
-
-          {message ? (
-            <p
-              className={
-                message.tone === "success"
-                  ? "mt-6 rounded-md border border-success/25 bg-success/10 px-4 py-3 text-sm text-success"
-                  : "mt-6 rounded-md border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger"
-              }
+        {/* Form panel */}
+        <div className="flex items-center justify-center">
+          <Reveal className="animate-rise w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-lg)] sm:p-8">
+            <Link
+              className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground lg:hidden"
+              href="/"
             >
-              {message.text}
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Accueil
+            </Link>
+
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary font-display text-base font-bold text-primary-foreground shadow-[var(--shadow-sm)]">
+              S
+            </span>
+            <h2 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              Connexion à Salary
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Saisissez votre adresse professionnelle. Nous vous envoyons un lien de connexion
+              sécurisé.
             </p>
-          ) : null}
 
-          <form action={requestMagicLink} className="mt-8 space-y-5">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="email">
-                Email professionnel
-              </label>
-              <input
-                autoComplete="email"
-                className="h-12 w-full rounded-md border border-border bg-background px-3 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
-                id="email"
-                name="email"
-                placeholder="nom@entreprise.com"
-                required
-                type="email"
-              />
-            </div>
-            <button
-              className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/25"
-              type="submit"
-            >
-              Envoyer le lien
-            </button>
-          </form>
-          <p className="mt-5 text-xs leading-5 text-muted-foreground">
-            Les liens doivent revenir vers l&apos;URL de production configuree dans Supabase Auth.
-          </p>
+            {message ? (
+              <p
+                role={message.tone === "success" ? "status" : "alert"}
+                className={
+                  message.tone === "success"
+                    ? "mt-6 flex items-start gap-2.5 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success"
+                    : "mt-6 flex items-start gap-2.5 rounded-xl border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger"
+                }
+              >
+                {message.tone === "success" ? (
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                )}
+                <span>{message.text}</span>
+              </p>
+            ) : null}
+
+            <form action={requestMagicLink} className="mt-7 space-y-5">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor="email">
+                  Email professionnel
+                </label>
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <input
+                    autoComplete="email"
+                    className="h-12 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25"
+                    id="email"
+                    inputMode="email"
+                    name="email"
+                    placeholder="nom@entreprise.com"
+                    required
+                    type="email"
+                  />
+                </div>
+              </div>
+              <button
+                className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-sm)] transition hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                type="submit"
+              >
+                Recevoir mon lien de connexion
+                <ArrowRight
+                  className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </button>
+            </form>
+
+            <p className="mt-5 flex items-center gap-2 text-xs leading-5 text-muted-foreground">
+              <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+              Le lien est valable un court instant. Vous pouvez en demander un nouveau à tout moment.
+            </p>
+          </Reveal>
         </div>
       </section>
     </main>

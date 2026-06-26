@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 
 import { PayrollImportUploadForm } from "@/components/imports/PayrollImportUploadForm";
 import { UploadStepper } from "@/components/imports/UploadStepper";
+import { AccessDenied } from "@/components/shell/AccessDenied";
+import { AppShell } from "@/components/shell/AppShell";
+import { PageHeader } from "@/components/shell/PageHeader";
 import {
   Table,
   TableBody,
@@ -53,73 +56,73 @@ export default async function ManagerImportsPage() {
   const imports = await loadManagerImports(supabase, actor.agencyId);
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
-      <header>
-        <p className="text-sm text-muted-foreground">Espace manager</p>
-        <h1 className="mt-2 text-2xl font-semibold">Imports de paie</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence.
-        </p>
-      </header>
+    <AppShell role={actor.role}>
+      <div className="flex flex-col gap-8">
+        <PageHeader
+          eyebrow="Espace manager"
+          title="Imports de paie"
+          description="Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence."
+        />
 
-      <UploadStepper currentStep={0} />
-      <PayrollImportUploadForm agencyId={actor.agencyId} />
+        <UploadStepper currentStep={0} />
+        <PayrollImportUploadForm agencyId={actor.agencyId} />
 
-      <section aria-labelledby="manager-imports-list-title" className="grid gap-4">
-        <div>
-          <h2 className="text-base font-semibold" id="manager-imports-list-title">
-            Derniers imports
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Les donnees affichees sont limitees a votre agence.
-          </p>
-        </div>
+        <section aria-labelledby="manager-imports-list-title" className="grid gap-4">
+          <div>
+            <h2 className="font-display text-base font-semibold" id="manager-imports-list-title">
+              Derniers imports
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les donnees affichees sont limitees a votre agence.
+            </p>
+          </div>
 
-        {imports.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fichier</TableHead>
-                <TableHead>Periode</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Lignes</TableHead>
-                <TableHead>Erreurs</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {imports.map((payrollImport) => (
-                <TableRow key={payrollImport.id}>
-                  <TableCell className="max-w-72 whitespace-normal break-words font-medium text-foreground">
-                    {payrollImport.sourceFilename}
-                    <span className="block text-xs text-muted-foreground">
-                      {formatDateTime(payrollImport.createdAt)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {payrollImport.periodStart} - {payrollImport.periodEnd}
-                  </TableCell>
-                  <TableCell>{payrollImport.status}</TableCell>
-                  <TableCell>{payrollImport.validRowCount}</TableCell>
-                  <TableCell>
-                    {payrollImport.invalidRowCount + payrollImport.unknownEmployeeCount}
-                  </TableCell>
-                  <TableCell>
-                    <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href={`/manager/imports/${payrollImport.id}`}>
-                      Ouvrir
-                    </Link>
-                  </TableCell>
+          {imports.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fichier</TableHead>
+                  <TableHead>Periode</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Lignes</TableHead>
+                  <TableHead>Erreurs</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <p className="rounded-md border border-border px-4 py-6 text-sm text-muted-foreground">
-            Aucun import n&apos;a encore ete charge pour votre agence.
-          </p>
-        )}
-      </section>
-    </main>
+              </TableHeader>
+              <TableBody>
+                {imports.map((payrollImport) => (
+                  <TableRow key={payrollImport.id}>
+                    <TableCell className="max-w-72 whitespace-normal break-words font-medium text-foreground">
+                      {payrollImport.sourceFilename}
+                      <span className="block text-xs text-muted-foreground">
+                        {formatDateTime(payrollImport.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {payrollImport.periodStart} - {payrollImport.periodEnd}
+                    </TableCell>
+                    <TableCell>{payrollImport.status}</TableCell>
+                    <TableCell>{payrollImport.validRowCount}</TableCell>
+                    <TableCell>
+                      {payrollImport.invalidRowCount + payrollImport.unknownEmployeeCount}
+                    </TableCell>
+                    <TableCell>
+                      <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href={`/manager/imports/${payrollImport.id}`}>
+                        Ouvrir
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+              Aucun import n&apos;a encore ete charge pour votre agence.
+            </p>
+          )}
+        </section>
+      </div>
+    </AppShell>
   );
 }
 
@@ -200,15 +203,7 @@ async function loadManagerImports(
 }
 
 function ForbiddenManagerAccess() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-10">
-      <p className="text-sm font-medium text-muted-foreground">Espace manager</p>
-      <h1 className="mt-3 text-2xl font-semibold">Acces refuse</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Votre role ne permet pas d&apos;ouvrir cette page.
-      </p>
-    </main>
-  );
+  return <AccessDenied context="Espace manager" />;
 }
 
 function hasErrorMessage(error: unknown, message: string): error is Error {

@@ -16,10 +16,10 @@ type Props = {
 export function ImportReport({ validRowCount, invalidRowCount, unknownEmployeeCount, errors }: Props) {
   return (
     <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric label="Lignes valides" value={validRowCount} />
-        <Metric label="Lignes en erreur" value={invalidRowCount} />
-        <Metric label="Salaries inconnus" value={unknownEmployeeCount} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <Metric label="Lignes valides" value={validRowCount} tone="success" />
+        <Metric label="Lignes en erreur" value={invalidRowCount} tone={invalidRowCount > 0 ? "danger" : undefined} />
+        <Metric label="Salaries inconnus" value={unknownEmployeeCount} tone={unknownEmployeeCount > 0 ? "warning" : undefined} />
       </div>
       {errors.length > 0 ? (
         <Table>
@@ -43,17 +43,37 @@ export function ImportReport({ validRowCount, invalidRowCount, unknownEmployeeCo
           </TableBody>
         </Table>
       ) : (
-        <p className="text-sm text-muted-foreground">Aucune erreur detectee.</p>
+        <p className="rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm font-medium text-success">
+          Aucune erreur detectee.
+        </p>
       )}
     </section>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+const TONE_CLASSES = {
+  success: "text-success",
+  danger: "text-danger",
+  warning: "text-warning",
+} as const;
+
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: keyof typeof TONE_CLASSES;
+}) {
   return (
-    <div className="rounded border border-border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={`mt-2 font-display text-2xl font-bold tabular-nums ${tone ? TONE_CLASSES[tone] : "text-foreground"}`}
+      >
+        {value.toLocaleString("fr-MG")}
+      </p>
     </div>
   );
 }
