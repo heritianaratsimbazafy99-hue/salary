@@ -26,8 +26,10 @@ export function AuditLogTable({ logs }: { logs: AuditLog[] }) {
       <TableBody>
         {logs.map((log) => (
           <TableRow key={log.id}>
-            <TableCell>{log.createdAt}</TableCell>
-            <TableCell>{log.actorRole}</TableCell>
+            <TableCell>
+              <time dateTime={log.createdAt}>{log.createdAt}</time>
+            </TableCell>
+            <TableCell>{log.actorRole ?? "Systeme"}</TableCell>
             <TableCell>{log.action}</TableCell>
             <TableCell>{log.resourceType}</TableCell>
           </TableRow>
