@@ -16,7 +16,7 @@ from public.payslips p
 join public.payslip_versions pv on pv.id = p.current_version_id
 join public.employees e on e.id = p.employee_id
 join public.agencies a on a.id = p.agency_id
-where public.is_global_reader();
+where private.is_global_reader();
 
 revoke all on table public.payroll_analytics_rows from public, anon, authenticated;
 grant select on table public.payroll_analytics_rows to authenticated, service_role;

@@ -40,119 +40,123 @@ grant select on table public.export_jobs to authenticated;
 grant all privileges on all tables in schema public to service_role;
 grant all privileges on all sequences in schema public to service_role;
 
-create or replace function public.current_profile_id()
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated, service_role;
+
+create or replace function private.current_profile_id()
 returns uuid
 language sql
 stable
-security invoker
-set search_path = public
+security definer
+set search_path = pg_catalog
 as $$
   select p.id
   from public.profiles p
   where p.auth_user_id = (select auth.uid())
 $$;
 
-create or replace function public.current_app_role()
+create or replace function private.current_app_role()
 returns public.app_role
 language sql
 stable
-security invoker
-set search_path = public
+security definer
+set search_path = pg_catalog
 as $$
   select p.role
   from public.profiles p
   where p.auth_user_id = (select auth.uid())
 $$;
 
-create or replace function public.current_agency_id()
+create or replace function private.current_agency_id()
 returns uuid
 language sql
 stable
-security invoker
-set search_path = public
+security definer
+set search_path = pg_catalog
 as $$
   select am.agency_id
   from public.agency_memberships am
-  where am.profile_id = public.current_profile_id()
+  where am.profile_id = private.current_profile_id()
 $$;
 
-create or replace function public.is_global_reader()
+create or replace function private.is_global_reader()
 returns boolean
 language sql
 stable
-security invoker
-set search_path = public
+security definer
+set search_path = pg_catalog
 as $$
-  select public.current_app_role() in ('hr_central', 'super_admin')
+  select private.current_app_role() in ('hr_central', 'super_admin')
 $$;
 
-revoke execute on function public.current_profile_id() from public;
-revoke execute on function public.current_app_role() from public;
-revoke execute on function public.current_agency_id() from public;
-revoke execute on function public.is_global_reader() from public;
+revoke execute on function private.current_profile_id() from public;
+revoke execute on function private.current_app_role() from public;
+revoke execute on function private.current_agency_id() from public;
+revoke execute on function private.is_global_reader() from public;
 
-grant execute on function public.current_profile_id() to authenticated, service_role;
-grant execute on function public.current_app_role() to authenticated, service_role;
-grant execute on function public.current_agency_id() to authenticated, service_role;
-grant execute on function public.is_global_reader() to authenticated, service_role;
+grant execute on function private.current_profile_id() to authenticated, service_role;
+grant execute on function private.current_app_role() to authenticated, service_role;
+grant execute on function private.current_agency_id() to authenticated, service_role;
+grant execute on function private.is_global_reader() to authenticated, service_role;
 
 create policy agencies_select_scoped on public.agencies
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and id = private.current_agency_id()
   )
 );
 
 create policy agencies_insert_global_admin on public.agencies
 for insert to authenticated
-with check (public.current_app_role() in ('hr_central', 'super_admin'));
+with check (private.current_app_role() in ('hr_central', 'super_admin'));
 
 create policy agencies_update_global_admin on public.agencies
 for update to authenticated
-using (public.current_app_role() in ('hr_central', 'super_admin'))
-with check (public.current_app_role() in ('hr_central', 'super_admin'));
+using (private.current_app_role() in ('hr_central', 'super_admin'))
+with check (private.current_app_role() in ('hr_central', 'super_admin'));
 
 create policy profiles_select_self_or_global on public.profiles
 for select to authenticated
 using (
   auth_user_id = (select auth.uid())
-  or public.is_global_reader()
+  or private.is_global_reader()
 );
 
 create policy memberships_select_scoped on public.agency_memberships
 for select to authenticated
 using (
-  profile_id = public.current_profile_id()
-  or public.is_global_reader()
+  profile_id = private.current_profile_id()
+  or private.is_global_reader()
 );
 
 create policy memberships_insert_global_admin on public.agency_memberships
 for insert to authenticated
-with check (public.current_app_role() in ('hr_central', 'super_admin'));
+with check (private.current_app_role() in ('hr_central', 'super_admin'));
 
 create policy memberships_update_global_admin on public.agency_memberships
 for update to authenticated
-using (public.current_app_role() in ('hr_central', 'super_admin'))
-with check (public.current_app_role() in ('hr_central', 'super_admin'));
+using (private.current_app_role() in ('hr_central', 'super_admin'))
+with check (private.current_app_role() in ('hr_central', 'super_admin'));
 
 create policy memberships_delete_global_admin on public.agency_memberships
 for delete to authenticated
-using (public.current_app_role() in ('hr_central', 'super_admin'));
+using (private.current_app_role() in ('hr_central', 'super_admin'));
 
 create policy employees_select_scoped on public.employees
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
   or (
-    public.current_app_role() = 'employee'
-    and profile_id = public.current_profile_id()
+    private.current_app_role() = 'employee'
+    and profile_id = private.current_profile_id()
   )
 );
 
@@ -160,87 +164,87 @@ create policy employees_insert_manager_or_admin on public.employees
 for insert to authenticated
 with check (
   (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
-  or public.current_app_role() = 'super_admin'
+  or private.current_app_role() = 'super_admin'
 );
 
 create policy imports_select_scoped on public.payroll_imports
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
 );
 
 create policy imports_insert_manager on public.payroll_imports
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and uploaded_by = public.current_profile_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
+  and uploaded_by = private.current_profile_id()
 );
 
 create policy imports_update_manager on public.payroll_imports
 for update to authenticated
 using (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
 )
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
 );
 
 create policy import_rows_select_scoped on public.payroll_import_rows
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
 );
 
 create policy import_rows_insert_manager on public.payroll_import_rows
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
   and exists (
     select 1
     from public.payroll_imports pi
     where pi.id = payroll_import_rows.import_id
       and pi.agency_id = payroll_import_rows.agency_id
-      and pi.uploaded_by = public.current_profile_id()
+      and pi.uploaded_by = private.current_profile_id()
   )
 );
 
 create policy import_rows_update_manager on public.payroll_import_rows
 for update to authenticated
 using (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
   and exists (
     select 1
     from public.payroll_imports pi
     where pi.id = payroll_import_rows.import_id
       and pi.agency_id = payroll_import_rows.agency_id
-      and pi.uploaded_by = public.current_profile_id()
+      and pi.uploaded_by = private.current_profile_id()
   )
 )
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
   and exists (
     select 1
     from public.payroll_imports pi
     where pi.id = payroll_import_rows.import_id
       and pi.agency_id = payroll_import_rows.agency_id
-      and pi.uploaded_by = public.current_profile_id()
+      and pi.uploaded_by = private.current_profile_id()
   )
 );
 
@@ -252,10 +256,10 @@ using (
     from public.payroll_imports pi
     where pi.id = payroll_import_errors.import_id
       and (
-        public.is_global_reader()
+        private.is_global_reader()
         or (
-          public.current_app_role() = 'agency_manager'
-          and pi.agency_id = public.current_agency_id()
+          private.current_app_role() = 'agency_manager'
+          and pi.agency_id = private.current_agency_id()
         )
       )
   )
@@ -264,63 +268,63 @@ using (
 create policy import_errors_insert_manager on public.payroll_import_errors
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
+  private.current_app_role() = 'agency_manager'
   and exists (
     select 1
     from public.payroll_imports pi
     where pi.id = payroll_import_errors.import_id
-      and pi.agency_id = public.current_agency_id()
-      and pi.uploaded_by = public.current_profile_id()
+      and pi.agency_id = private.current_agency_id()
+      and pi.uploaded_by = private.current_profile_id()
   )
 );
 
 create policy mappings_select_scoped on public.column_mappings
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
 );
 
 create policy mappings_insert_manager on public.column_mappings
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and created_by = public.current_profile_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
+  and created_by = private.current_profile_id()
 );
 
 create policy mappings_update_manager on public.column_mappings
 for update to authenticated
 using (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
 )
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and created_by = public.current_profile_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
+  and created_by = private.current_profile_id()
 );
 
 create policy payslips_select_scoped on public.payslips
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
   )
   or (
-    public.current_app_role() = 'employee'
+    private.current_app_role() = 'employee'
     and current_version_id is not null
     and (expires_at is null or expires_at > now())
     and exists (
       select 1
       from public.employees e
       where e.id = payslips.employee_id
-        and e.profile_id = public.current_profile_id()
+        and e.profile_id = private.current_profile_id()
     )
   )
 );
@@ -328,9 +332,9 @@ using (
 create policy payslips_insert_manager on public.payslips
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and published_by = public.current_profile_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
+  and published_by = private.current_profile_id()
   and exists (
     select 1
     from public.employees e
@@ -349,16 +353,16 @@ using (
     where p.id = payslip_versions.payslip_id
       and p.agency_id = payslip_versions.agency_id
       and (
-        public.is_global_reader()
+        private.is_global_reader()
         or (
-          public.current_app_role() = 'agency_manager'
-          and p.agency_id = public.current_agency_id()
+          private.current_app_role() = 'agency_manager'
+          and p.agency_id = private.current_agency_id()
         )
         or (
-          public.current_app_role() = 'employee'
+          private.current_app_role() = 'employee'
           and p.current_version_id = payslip_versions.id
           and (p.expires_at is null or p.expires_at > now())
-          and e.profile_id = public.current_profile_id()
+          and e.profile_id = private.current_profile_id()
         )
       )
   )
@@ -367,9 +371,9 @@ using (
 create policy payslip_versions_insert_manager on public.payslip_versions
 for insert to authenticated
 with check (
-  public.current_app_role() = 'agency_manager'
-  and agency_id = public.current_agency_id()
-  and published_by = public.current_profile_id()
+  private.current_app_role() = 'agency_manager'
+  and agency_id = private.current_agency_id()
+  and published_by = private.current_profile_id()
   and exists (
     select 1
     from public.payslips p
@@ -378,28 +382,28 @@ with check (
       and pi.agency_id = payslip_versions.agency_id
     where p.id = payslip_versions.payslip_id
       and p.agency_id = payslip_versions.agency_id
-      and p.agency_id = public.current_agency_id()
+      and p.agency_id = private.current_agency_id()
   )
 );
 
 create policy audit_select_global on public.audit_logs
 for select to authenticated
-using (public.is_global_reader());
+using (private.is_global_reader());
 
 create policy notifications_select_recipient_or_global on public.notifications
 for select to authenticated
 using (
-  public.is_global_reader()
-  or recipient_profile_id = public.current_profile_id()
+  private.is_global_reader()
+  or recipient_profile_id = private.current_profile_id()
 );
 
 create policy exports_select_authorized on public.export_jobs
 for select to authenticated
 using (
-  public.is_global_reader()
+  private.is_global_reader()
   or (
-    public.current_app_role() = 'agency_manager'
-    and agency_id = public.current_agency_id()
+    private.current_app_role() = 'agency_manager'
+    and agency_id = private.current_agency_id()
     and export_type = 'IMPORT_REPORT'
   )
 );

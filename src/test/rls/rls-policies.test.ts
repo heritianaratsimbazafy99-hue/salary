@@ -19,6 +19,13 @@ const authenticatedGrantStatements = rlsMigrationSql.match(/grant\s+[^;]+to\s+au
 const payslipVersionsTableSql = coreSchemaSql.match(
   /create table public\.payslip_versions \((.*?)\); alter table public\.payslips/s,
 )?.[1] ?? "";
+const roleHelperNames = [
+  "current_profile_id",
+  "current_app_role",
+  "current_agency_id",
+  "is_global_reader",
+] as const;
+const publicRoleHelperCallPattern = /\bpublic\.(current_profile_id|current_app_role|current_agency_id|is_global_reader)\s*\(/;
 
 type PolicyCase = {
   actorRole: string;
@@ -152,15 +159,61 @@ describe("RLS policy model", () => {
     );
   });
 
+  it("keeps RLS role helpers private security definer functions with scoped execute grants", () => {
+    expect(rlsMigrationSql).toContain("create schema if not exists private;");
+    expect(rlsMigrationSql).toContain("revoke all on schema private from public;");
+    expect(rlsMigrationSql).toContain("grant usage on schema private to authenticated, service_role;");
+
+    const expectedReturns = {
+      current_profile_id: "uuid",
+      current_app_role: "public.app_role",
+      current_agency_id: "uuid",
+      is_global_reader: "boolean",
+    } satisfies Record<(typeof roleHelperNames)[number], string>;
+
+    for (const helperName of roleHelperNames) {
+      expect(rlsMigrationSql).not.toMatch(
+        new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${helperName}\\s*\\(`),
+      );
+      expect(rlsMigrationSql).toMatch(
+        new RegExp(
+          `create\\s+or\\s+replace\\s+function\\s+private\\.${helperName}\\s*\\(\\)\\s+returns\\s+${expectedReturns[helperName]}\\s+language\\s+sql\\s+stable\\s+security\\s+definer\\s+set\\s+search_path\\s*=\\s*pg_catalog\\s+as\\s+\\$\\$`,
+        ),
+      );
+      expect(rlsMigrationSql).toContain(`revoke execute on function private.${helperName}() from public;`);
+      expect(rlsMigrationSql).toContain(
+        `grant execute on function private.${helperName}() to authenticated, service_role;`,
+      );
+      expect(rlsMigrationSql).not.toMatch(
+        new RegExp(`grant\\s+execute\\s+on\\s+function\\s+private\\.${helperName}\\s*\\(\\)\\s+to\\s+(public|anon)\\b`),
+      );
+    }
+  });
+
+  it("routes RLS policies and reporting views through private helpers", () => {
+    expect(rlsMigrationSql).toContain(
+      "or ( private.current_app_role() = 'employee' and profile_id = private.current_profile_id() )",
+    );
+    expect(rlsMigrationSql).not.toMatch(publicRoleHelperCallPattern);
+    expect(reportingViewsSql).toContain("where private.is_global_reader()");
+    expect(reportingViewsSql).not.toMatch(publicRoleHelperCallPattern);
+  });
+
+  it("does not use auth metadata claims as an authorization source", () => {
+    const authorizationSql = `${rlsMigrationSql} ${reportingViewsSql}`;
+
+    expect(authorizationSql).not.toMatch(/\b(user_metadata|raw_user_meta_data|raw_app_meta_data)\b/);
+  });
+
   it("requires employee role on employee-owned SQL read branches", () => {
     expect(rlsMigrationSql).toContain(
-      "or ( public.current_app_role() = 'employee' and profile_id = public.current_profile_id() )",
+      "or ( private.current_app_role() = 'employee' and profile_id = private.current_profile_id() )",
     );
     expect(rlsMigrationSql).toContain(
-      "or ( public.current_app_role() = 'employee' and current_version_id is not null",
+      "or ( private.current_app_role() = 'employee' and current_version_id is not null",
     );
     expect(rlsMigrationSql).toContain(
-      "or ( public.current_app_role() = 'employee' and p.current_version_id = payslip_versions.id",
+      "or ( private.current_app_role() = 'employee' and p.current_version_id = payslip_versions.id",
     );
   });
 
@@ -365,7 +418,7 @@ describe("RLS policy model", () => {
     expect(reportingViewsSql).toContain(
       "create view public.payroll_analytics_rows with (security_invoker = true)",
     );
-    expect(reportingViewsSql).toContain("where public.is_global_reader()");
+    expect(reportingViewsSql).toContain("where private.is_global_reader()");
     expect(reportingViewsSql).toContain(
       "revoke all on table public.payroll_analytics_rows from public, anon, authenticated;",
     );
