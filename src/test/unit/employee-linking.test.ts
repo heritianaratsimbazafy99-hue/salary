@@ -8,13 +8,13 @@ describe("normalizeEmployeeIdentity", () => {
         agencyId: "agency-1",
         employeeId: " emp-001 ",
         email: "USER@EXAMPLE.COM",
-        fullName: " Jean Rakoto ",
+        fullName: " Jean   Rakoto\tAndry ",
       }),
     ).toEqual({
       agencyId: "agency-1",
       employeeId: "EMP-001",
       email: "user@example.com",
-      fullName: "Jean Rakoto",
+      fullName: "Jean Rakoto Andry",
     });
   });
 });
