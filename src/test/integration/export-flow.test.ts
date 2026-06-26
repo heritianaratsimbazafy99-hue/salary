@@ -38,26 +38,100 @@ function createMalformedJsonRequest() {
 }
 
 describe("canCreateExport", () => {
-  it("allows agency manager import report exports for own agency", () => {
-    expect(
-      canCreateExport({
+  const cases = [
+    {
+      name: "allows hr central import report exports",
+      input: { role: "hr_central", exportType: "IMPORT_REPORT" },
+      expected: true,
+    },
+    {
+      name: "allows hr central published payslip exports",
+      input: { role: "hr_central", exportType: "PUBLISHED_PAYSLIPS" },
+      expected: true,
+    },
+    {
+      name: "allows super admin import report exports",
+      input: { role: "super_admin", exportType: "IMPORT_REPORT" },
+      expected: true,
+    },
+    {
+      name: "allows super admin published payslip exports",
+      input: { role: "super_admin", exportType: "PUBLISHED_PAYSLIPS" },
+      expected: true,
+    },
+    {
+      name: "allows agency manager import report exports for own agency",
+      input: {
         role: "agency_manager",
         exportType: "IMPORT_REPORT",
         actorAgencyId: "agency-1",
         requestedAgencyId: "agency-1",
-      }),
-    ).toBe(true);
-  });
-
-  it("denies agency manager published payslip exports", () => {
-    expect(
-      canCreateExport({
+      },
+      expected: true,
+    },
+    {
+      name: "denies agency manager published payslip exports for own agency",
+      input: {
         role: "agency_manager",
         exportType: "PUBLISHED_PAYSLIPS",
         actorAgencyId: "agency-1",
         requestedAgencyId: "agency-1",
-      }),
-    ).toBe(false);
+      },
+      expected: false,
+    },
+    {
+      name: "denies agency manager cross-agency import report exports",
+      input: {
+        role: "agency_manager",
+        exportType: "IMPORT_REPORT",
+        actorAgencyId: "agency-1",
+        requestedAgencyId: "agency-2",
+      },
+      expected: false,
+    },
+    {
+      name: "denies agency manager import report exports when actor agency is missing",
+      input: {
+        role: "agency_manager",
+        exportType: "IMPORT_REPORT",
+        requestedAgencyId: "agency-1",
+      },
+      expected: false,
+    },
+    {
+      name: "denies agency manager import report exports when actor agency is null",
+      input: {
+        role: "agency_manager",
+        exportType: "IMPORT_REPORT",
+        actorAgencyId: null,
+        requestedAgencyId: "agency-1",
+      },
+      expected: false,
+    },
+    {
+      name: "denies agency manager import report exports when agency ids are empty",
+      input: {
+        role: "agency_manager",
+        exportType: "IMPORT_REPORT",
+        actorAgencyId: "",
+        requestedAgencyId: "",
+      },
+      expected: false,
+    },
+    {
+      name: "denies employee import report exports",
+      input: { role: "employee", exportType: "IMPORT_REPORT" },
+      expected: false,
+    },
+    {
+      name: "denies employee published payslip exports",
+      input: { role: "employee", exportType: "PUBLISHED_PAYSLIPS" },
+      expected: false,
+    },
+  ] as const;
+
+  it.each(cases)("$name", ({ input, expected }) => {
+    expect(canCreateExport(input)).toBe(expected);
   });
 });
 
