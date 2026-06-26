@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyManualAdjustment } from "@/lib/payroll/adjustments";
+import type { PayrollRow } from "@/lib/payroll/schema";
 
 describe("applyManualAdjustment", () => {
   it("applies a manual adjustment without changing original imported data", () => {
@@ -34,5 +35,39 @@ describe("applyManualAdjustment", () => {
       manualAdjustments: {},
       hasManualAdjustments: false,
     });
+  });
+
+  it("ignores unknown payroll fields", () => {
+    const result = applyManualAdjustment(
+      { netAmount: 1000, grossAmount: 1200 },
+      { netAmuont: 1100 } as unknown as Partial<PayrollRow>,
+    );
+
+    expect(result).toEqual({
+      normalizedData: { netAmount: 1000, grossAmount: 1200 },
+      manualAdjustments: {},
+      hasManualAdjustments: false,
+    });
+  });
+
+  it("does not let special keys affect adjustment tracking", () => {
+    const changes = Object.create(null) as Record<string, unknown>;
+    changes.__proto__ = { polluted: true };
+
+    const result = applyManualAdjustment(
+      { netAmount: 1000, grossAmount: 1200 },
+      changes as Partial<PayrollRow>,
+    );
+
+    expect(result).toEqual({
+      normalizedData: { netAmount: 1000, grossAmount: 1200 },
+      manualAdjustments: {},
+      hasManualAdjustments: false,
+    });
+
+    const auditPrototype = Object.getPrototypeOf(result.manualAdjustments);
+
+    expect(auditPrototype === null || auditPrototype === Object.prototype).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(result.normalizedData, "__proto__")).toBe(false);
   });
 });

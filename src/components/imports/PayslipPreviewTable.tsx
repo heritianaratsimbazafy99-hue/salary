@@ -16,8 +16,8 @@ export function PayslipPreviewTable({ rows }: { rows: PreviewRow[] }) {
   }
 
   return (
-    <Table>
-      <TableHeader className="bg-muted text-xs text-muted-foreground">
+    <Table aria-label="Apercu des fiches de paie importees">
+      <TableHeader>
         <TableRow>
           <TableHead>Salarie</TableHead>
           <TableHead>Brut</TableHead>
@@ -29,9 +29,9 @@ export function PayslipPreviewTable({ rows }: { rows: PreviewRow[] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
-            <TableCell>
+            <TableCell className="max-w-64 whitespace-normal break-words">
               <span className="font-medium">{row.employeeName}</span>
-              <span className="block text-xs text-muted-foreground">{row.employeeId}</span>
+              <span className="block break-all text-xs text-muted-foreground">{row.employeeId}</span>
             </TableCell>
             <TableCell>{formatMga(row.grossAmount)}</TableCell>
             <TableCell>{formatMga(row.deductionsTotal)}</TableCell>
