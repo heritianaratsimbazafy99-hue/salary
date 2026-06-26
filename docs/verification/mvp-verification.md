@@ -1,19 +1,28 @@
 # MVP Verification
 
+## Latest Local Evidence
+
+Verified on 2026-06-26 from branch `codex/payroll-platform`.
+
 ## Commands
 
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-- `npm run test:e2e`
-- `supabase db reset`
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with 0 warnings.
+- `npm run test`: 19 test files passed, 145 tests passed.
+- `npm run build`: passed after sandbox escalation for Turbopack process/port access.
+- `supabase db reset --local`: passed, replayed migrations `202606260001_core_schema.sql`, `202606260002_rls_policies.sql`, `202606260003_reporting_views.sql`, and `supabase/seed.sql`.
+- `supabase db advisors --local --type all --level warn --fail-on error`: passed, no issues found.
+- `npm run test:e2e`: 8 Playwright tests passed across desktop Chromium and mobile Pixel 5.
+- `npm audit --audit-level=high`: passed with 0 high or critical vulnerabilities. It reports 4 moderate transitive advisories in `next/postcss` and `exceljs/uuid`; available fixes are force upgrades with breaking dependency changes.
+- `git diff --check`: passed.
 
 ## Browser Checks
 
-- Manager import workflow at 320px, 768px, 1024px, and 1440px.
-- Employee payslip page at 320px and 1440px.
-- HR audit and analytics pages at 1024px and 1440px.
+- Manager import workflow shell renders on desktop and mobile.
+- Manager import detail report shell renders on desktop and mobile.
+- Anonymous users are redirected to `/auth/login` instead of seeing restricted employee payslip and HR analytics spaces.
 
-## Evidence
+## Remaining Verification Notes
 
-Paste final command summaries and screenshot paths in the pull request description.
+- Resend live delivery is intentionally outside the MVP completion gate. The committed boundary verifies notification templates do not expose payroll amounts and disables the local test endpoint in production.
+- Local Supabase secret keys from `supabase status` are not committed and must not be copied into public client environment variables.
