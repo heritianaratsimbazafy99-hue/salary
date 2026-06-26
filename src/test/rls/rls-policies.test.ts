@@ -159,6 +159,12 @@ describe("RLS policy model", () => {
     );
   });
 
+  it("does not grant direct authenticated updates on payroll imports status", () => {
+    expect(rlsMigrationSql).toContain("grant select, insert on table public.payroll_imports to authenticated;");
+    expect(rlsMigrationSql).not.toContain("grant select, insert, update on table public.payroll_imports to authenticated;");
+    expect(rlsMigrationSql).not.toContain("create policy imports_update_manager on public.payroll_imports");
+  });
+
   it("keeps RLS role helpers private security definer functions with scoped execute grants", () => {
     expect(rlsMigrationSql).toContain("create schema if not exists private;");
     expect(rlsMigrationSql).toContain("revoke all on schema private from public;");

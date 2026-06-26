@@ -16,8 +16,11 @@
 - HR central has global read-only access for payroll workflows.
 - Super admin access is minimal and audited.
 - Import and export API routes return structured 401, 403, and 422 responses for auth and validation failures.
-- Publication writes use the service role only after the manager and agency guard has passed. User-scoped clients still load the import and enforce the authorization boundary before admin writes are created.
+- Publication writes use a transaction-backed PostgreSQL RPC through the service role only after the manager and agency guard has passed. User-scoped clients still load the import and enforce the authorization boundary before admin RPC clients are created.
+- The publication RPC is `security definer` with an empty `search_path`; execute is revoked from `anon` and `authenticated` and granted only to `service_role`.
 - Publication is allowed only from `READY_FOR_PREVIEW`; non-publishable statuses return conflict before admin write clients are created.
+- Authenticated clients do not have direct `UPDATE` grants on `payroll_imports`; status transitions are controlled by server-side workflows.
+- `NEEDS_MAPPING` imports retain raw unknown-column values, expose a manager mapping form, persist per-agency column mappings, recalculate pay items, and move to `READY_FOR_PREVIEW` before publication is available.
 - Export requests create `export_jobs` and audit events only after the export authorization check passes.
 
 ## Sensitive Data
@@ -32,7 +35,7 @@
 
 - `npm run typecheck`: passed.
 - `npm run lint`: passed with 0 warnings.
-- `npm run test`: 20 test files passed, 160 tests passed.
+- `npm run test`: 21 test files passed, 166 tests passed.
 - `npm run build`: passed.
 - `npm run test:e2e`: 8 Playwright tests passed.
 - `supabase db reset --local`: passed.
@@ -41,5 +44,5 @@
 
 ## Residual Risks
 
-- Payroll publication and export creation are controlled sequences of Supabase writes, not single database transactions or RPCs. A later hardening pass should move them into transaction-backed RPCs if partial-write rollback becomes required.
+- Export creation remains a controlled sequence of Supabase writes rather than a transaction-backed RPC; publication has been moved into a transaction-backed RPC.
 - Moderate dependency advisories require breaking forced upgrades according to `npm audit`; they are tracked but not blocking this MVP gate because no high or critical advisory is present.

@@ -51,7 +51,7 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
       <Input label="Debut de periode" name="periodStart" required type="date" />
       <Input label="Fin de periode" name="periodEnd" required type="date" />
       <Input
-        accept=".xlsx,.xls"
+        accept=".xlsx"
         className="pt-2"
         label="Fichier Excel"
         name="file"

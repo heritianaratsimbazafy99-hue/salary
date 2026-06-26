@@ -98,16 +98,19 @@ export async function persistPayrollImport(input: {
     periodEnd: input.periodEnd,
     periodStart: input.periodStart,
   });
+  const hasValidRows = periodValidationResult.validRows.length > 0;
   const mappings = await loadColumnMappings(input.supabase, input.agencyId);
   const mappedColumns = new Set(mappings.map((mapping) => mapping.sourceColumn));
-  const unmappedUnknownColumns = parseResult.unknownColumns.filter((column) => !mappedColumns.has(column));
+  const unmappedUnknownColumns = hasValidRows
+    ? parseResult.unknownColumns.filter((column) => !mappedColumns.has(column))
+    : [];
   const unknownEmployeeIds = await findUnknownEmployeeIds(
     input.supabase,
     input.agencyId,
     periodValidationResult.validRows.map((row) => row.data.employeeId),
   );
   const status: PayrollImportStatus =
-    unmappedUnknownColumns.length > 0 ? "NEEDS_MAPPING" : "READY_FOR_PREVIEW";
+    !hasValidRows ? "FAILED" : unmappedUnknownColumns.length > 0 ? "NEEDS_MAPPING" : "READY_FOR_PREVIEW";
 
   const importId = await insertImportRecord(input.supabase, {
     agencyId: input.agencyId,
@@ -131,6 +134,7 @@ export async function persistPayrollImport(input: {
     manual_adjustments: {},
     normalized_data: row.data,
     pay_items: applyColumnMappings(row.unknownColumns, mappings),
+    raw_unknown_columns: row.unknownColumns,
   }));
 
   if (validImportRows.length > 0) {

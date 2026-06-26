@@ -27,7 +27,7 @@ grant select, insert, update on table public.agencies to authenticated;
 grant select on table public.profiles to authenticated;
 grant select, insert, update, delete on table public.agency_memberships to authenticated;
 grant select, insert on table public.employees to authenticated;
-grant select, insert, update on table public.payroll_imports to authenticated;
+grant select, insert on table public.payroll_imports to authenticated;
 grant select, insert, update on table public.payroll_import_rows to authenticated;
 grant select, insert on table public.payroll_import_errors to authenticated;
 grant select, insert, update on table public.column_mappings to authenticated;
@@ -186,17 +186,6 @@ with check (
   private.current_app_role() = 'agency_manager'
   and agency_id = private.current_agency_id()
   and uploaded_by = private.current_profile_id()
-);
-
-create policy imports_update_manager on public.payroll_imports
-for update to authenticated
-using (
-  private.current_app_role() = 'agency_manager'
-  and agency_id = private.current_agency_id()
-)
-with check (
-  private.current_app_role() = 'agency_manager'
-  and agency_id = private.current_agency_id()
 );
 
 create policy import_rows_select_scoped on public.payroll_import_rows

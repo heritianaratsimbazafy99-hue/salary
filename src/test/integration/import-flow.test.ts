@@ -633,7 +633,44 @@ describe("POST /api/imports", () => {
     });
     expect(db.payroll_import_rows[0]).toMatchObject({
       pay_items: [],
+      raw_unknown_columns: {
+        cafeteria: 2500,
+      },
     });
+  });
+
+  it("marks imports as failed when unknown columns exist but no valid rows can be mapped", async () => {
+    const { db } = createAuthorizedImportClient();
+
+    const formData = new FormData();
+    appendRequiredImportFields(
+      formData,
+      await createPayrollFile([
+        {
+          ...validPayrollRow,
+          cafeteria: 2500,
+          email: "not-an-email",
+          employee_name: "",
+        },
+      ]),
+    );
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        invalidRowCount: 1,
+        status: "FAILED",
+        unknownColumns: [],
+        validRowCount: 0,
+      },
+    });
+    expect(db.payroll_imports[0]).toMatchObject({
+      status: "FAILED",
+      valid_row_count: 0,
+    });
+    expect(db.payroll_import_rows).toHaveLength(0);
   });
 
   it("counts valid rows whose employee ids are not known for the agency", async () => {

@@ -97,8 +97,10 @@ describe("ManagerImportsPage", () => {
     expect(client.importsQuery.eq).toHaveBeenCalledWith("agency_id", AGENCY_ID);
     const form = container.querySelector('form[action="/api/imports"][method="post"]');
     const agencyInput = container.querySelector<HTMLInputElement>('input[name="agencyId"]');
+    const fileInput = container.querySelector<HTMLInputElement>('input[name="file"]');
     expect(form).toBeTruthy();
     expect(agencyInput?.value).toBe(AGENCY_ID);
+    expect(fileInput?.accept).toBe(".xlsx");
     expect(screen.getByRole("heading", { name: "Imports de paie" })).toBeTruthy();
     expect(screen.getByText(/paie-juin\.xlsx/)).toBeTruthy();
     expect(screen.getByRole("link", { name: /Ouvrir/ }).getAttribute("href")).toBe(
@@ -177,6 +179,54 @@ describe("ManagerImportDetailPage", () => {
     expect(screen.getByText("Montant brut invalide")).toBeTruthy();
     expect(screen.getByText("Rina Salary")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Publier" })).toBeTruthy();
+  });
+
+  it("renders a mapping form when the import needs column mapping", async () => {
+    const client = createManagerImportsClient({
+      errors: [],
+      importRecord: {
+        agency_id: AGENCY_ID,
+        id: IMPORT_ID,
+        invalid_row_count: 0,
+        period_end: "2026-06-30",
+        period_start: "2026-06-01",
+        source_filename: "paie-juin.xlsx",
+        status: "NEEDS_MAPPING",
+        unknown_employee_count: 0,
+        valid_row_count: 1,
+      },
+      previewRows: [
+        {
+          employee_id: "EMP-001",
+          employee_name: "Rina Salary",
+          has_manual_adjustments: false,
+          id: "00000000-0000-0000-0000-000000000401",
+          normalized_data: {
+            deductionsTotal: 250000,
+            grossAmount: 1500000,
+            netAmount: 1250000,
+          },
+          raw_unknown_columns: {
+            cafeteria: 2500,
+          },
+        },
+      ],
+    });
+    managerImportsPageMocks.getCurrentAgencyScopedActor.mockResolvedValue({
+      agencyId: AGENCY_ID,
+      id: MANAGER_ID,
+      role: "agency_manager",
+    });
+    managerImportsPageMocks.createClient.mockResolvedValue(client);
+
+    const { default: ManagerImportDetailPage } = await import("@/app/manager/imports/[importId]/page");
+
+    render(await ManagerImportDetailPage({ params: Promise.resolve({ importId: IMPORT_ID }) }));
+
+    expect(screen.getByRole("heading", { name: "Mapping des colonnes" })).toBeTruthy();
+    expect(screen.getByText("cafeteria")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enregistrer les mappings" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Publier" })).toBeNull();
   });
 });
 

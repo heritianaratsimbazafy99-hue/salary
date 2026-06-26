@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
+import { ColumnMappingForm } from "@/components/imports/ColumnMappingForm";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { PayslipPreviewTable } from "@/components/imports/PayslipPreviewTable";
 import { PublishImportButton } from "@/components/imports/PublishImportButton";
@@ -44,6 +45,7 @@ type ImportRowRecord = {
   has_manual_adjustments?: unknown;
   id?: unknown;
   normalized_data?: unknown;
+  raw_unknown_columns?: unknown;
 };
 
 type ImportDetail = {
@@ -72,6 +74,7 @@ type PreviewRow = {
   hasManualAdjustments: boolean;
   id: string;
   netAmount: number;
+  rawUnknownColumns: Record<string, unknown>;
 };
 
 export default async function ImportDetailPage({ params }: PageProps) {
@@ -101,6 +104,9 @@ export default async function ImportDetailPage({ params }: PageProps) {
       importId: normalizedImportId,
     }),
   ]);
+  const unknownColumns = uniqueSortedColumns(
+    previewRows.flatMap((row) => Object.keys(row.rawUnknownColumns)),
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
@@ -124,6 +130,17 @@ export default async function ImportDetailPage({ params }: PageProps) {
         unknownEmployeeCount={payrollImport.unknownEmployeeCount}
         validRowCount={payrollImport.validRowCount}
       />
+
+      {payrollImport.status === "NEEDS_MAPPING" ? (
+        <section aria-labelledby="mapping-title" className="grid gap-4">
+          <div>
+            <h2 className="text-base font-semibold" id="mapping-title">
+              Mapping des colonnes
+            </h2>
+          </div>
+          <ColumnMappingForm importId={payrollImport.id} unknownColumns={unknownColumns} />
+        </section>
+      ) : null}
 
       <section aria-labelledby="preview-title" className="grid gap-4">
         <div>
@@ -279,7 +296,7 @@ async function loadPayrollImportRows(
     };
   };
   const { data, error } = await query
-    .select("id,employee_id,employee_name,normalized_data,has_manual_adjustments")
+    .select("id,employee_id,employee_name,normalized_data,has_manual_adjustments,raw_unknown_columns")
     .eq("import_id", input.importId)
     .eq("agency_id", input.agencyId)
     .order("employee_name", { ascending: true })
@@ -309,6 +326,7 @@ async function loadPayrollImportRows(
         hasManualAdjustments: row.has_manual_adjustments === true,
         id: row.id,
         netAmount: toCount(normalizedData.netAmount),
+        rawUnknownColumns: toRecord(row.raw_unknown_columns),
       },
     ];
   });
@@ -338,6 +356,10 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function toCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function uniqueSortedColumns(columns: string[]) {
+  return Array.from(new Set(columns)).sort((left, right) => left.localeCompare(right));
 }
 
 function currentStepForStatus(status: string): number {
