@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 
 import { PayslipView } from "@/components/payslips/PayslipView";
 import { AccessDenied } from "@/components/shell/AccessDenied";
+import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
@@ -32,14 +33,16 @@ export default async function EmployeePayslipsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 px-5 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Espace salarié"
-        title="Mes fiches de paie"
-        description="Consultez et téléchargez vos fiches internes publiées."
-      />
-      {payslip ? <PayslipView {...payslip} /> : <EmptyPayslipState />}
-    </main>
+    <AppShell role="employee">
+      <div className="mx-auto max-w-3xl space-y-8">
+        <PageHeader
+          eyebrow="Espace salarié"
+          title="Mes fiches de paie"
+          description="Consultez et téléchargez vos fiches internes publiées."
+        />
+        {payslip ? <PayslipView {...payslip} /> : <EmptyPayslipState />}
+      </div>
+    </AppShell>
   );
 }
 

@@ -6,6 +6,7 @@ import { PayslipPreviewTable } from "@/components/imports/PayslipPreviewTable";
 import { PublishImportButton } from "@/components/imports/PublishImportButton";
 import { UploadStepper } from "@/components/imports/UploadStepper";
 import { AccessDenied } from "@/components/shell/AccessDenied";
+import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import {
@@ -111,49 +112,51 @@ export default async function ImportDetailPage({ params }: PageProps) {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Espace manager"
-        title="Rapport d'import"
-        description={`${payrollImport.sourceFilename} · ${payrollImport.periodStart} – ${payrollImport.periodEnd}`}
-        actions={
-          payrollImport.status === "READY_FOR_PREVIEW" ? (
-            <PublishImportButton importId={payrollImport.id} />
-          ) : undefined
-        }
-      />
+    <AppShell role={actor.role}>
+      <div className="flex flex-col gap-8">
+        <PageHeader
+          eyebrow="Espace manager"
+          title="Rapport d'import"
+          description={`${payrollImport.sourceFilename} · ${payrollImport.periodStart} – ${payrollImport.periodEnd}`}
+          actions={
+            payrollImport.status === "READY_FOR_PREVIEW" ? (
+              <PublishImportButton importId={payrollImport.id} />
+            ) : undefined
+          }
+        />
 
-      <UploadStepper currentStep={currentStepForStatus(payrollImport.status)} />
-      <ImportReport
-        errors={errors}
-        invalidRowCount={payrollImport.invalidRowCount}
-        unknownEmployeeCount={payrollImport.unknownEmployeeCount}
-        validRowCount={payrollImport.validRowCount}
-      />
+        <UploadStepper currentStep={currentStepForStatus(payrollImport.status)} />
+        <ImportReport
+          errors={errors}
+          invalidRowCount={payrollImport.invalidRowCount}
+          unknownEmployeeCount={payrollImport.unknownEmployeeCount}
+          validRowCount={payrollImport.validRowCount}
+        />
 
-      {payrollImport.status === "NEEDS_MAPPING" ? (
-        <section aria-labelledby="mapping-title" className="grid gap-4">
+        {payrollImport.status === "NEEDS_MAPPING" ? (
+          <section aria-labelledby="mapping-title" className="grid gap-4">
+            <div>
+              <h2 className="font-display text-base font-semibold" id="mapping-title">
+                Mapping des colonnes
+              </h2>
+            </div>
+            <ColumnMappingForm importId={payrollImport.id} unknownColumns={unknownColumns} />
+          </section>
+        ) : null}
+
+        <section aria-labelledby="preview-title" className="grid gap-4">
           <div>
-            <h2 className="font-display text-base font-semibold" id="mapping-title">
-              Mapping des colonnes
+            <h2 className="font-display text-base font-semibold" id="preview-title">
+              Previsualisation
             </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Apercu des lignes valides rattachees a cet import.
+            </p>
           </div>
-          <ColumnMappingForm importId={payrollImport.id} unknownColumns={unknownColumns} />
+          <PayslipPreviewTable rows={previewRows} />
         </section>
-      ) : null}
-
-      <section aria-labelledby="preview-title" className="grid gap-4">
-        <div>
-          <h2 className="font-display text-base font-semibold" id="preview-title">
-            Previsualisation
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Apercu des lignes valides rattachees a cet import.
-          </p>
-        </div>
-        <PayslipPreviewTable rows={previewRows} />
-      </section>
-    </main>
+      </div>
+    </AppShell>
   );
 }
 

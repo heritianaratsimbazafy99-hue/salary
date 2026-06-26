@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { PayrollAnalytics } from "@/components/analytics/PayrollAnalytics";
 import { AccessDenied } from "@/components/shell/AccessDenied";
+import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireCanReadPayrollAnalytics } from "@/lib/admin/auth";
 import {
@@ -42,14 +43,16 @@ export default async function AnalyticsPage() {
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Administration RH"
-        title="Analytics paie"
-        description="Analyse détaillée des données de paie publiées sur l'ensemble des agences."
-      />
-      <PayrollAnalytics rows={rows} />
-    </main>
+    <AppShell role={actor.role}>
+      <div className="flex flex-col gap-8">
+        <PageHeader
+          eyebrow="Administration RH"
+          title="Analytics paie"
+          description="Analyse détaillée des données de paie publiées sur l'ensemble des agences."
+        />
+        <PayrollAnalytics rows={rows} />
+      </div>
+    </AppShell>
   );
 }
 
