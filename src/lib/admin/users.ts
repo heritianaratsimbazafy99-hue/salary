@@ -12,6 +12,10 @@ export type AgencyManagerProfile = {
   role: "agency_manager";
 };
 
+type AuthUserRecord = {
+  id?: unknown;
+};
+
 const CreateAgencyManagerInputSchema = z.object({
   agencyId: z.string().trim().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   email: z
@@ -36,17 +40,34 @@ export async function createAgencyManager(input: {
   await requireCanAssignAgencyManager();
 
   const admin = createAdminClient();
+  const { data: authUserData, error: authUserError } = await admin.auth.admin.createUser({
+    email: parsedInput.data.email,
+    email_confirm: true,
+    user_metadata: {
+      full_name: parsedInput.data.fullName,
+      role: "agency_manager",
+    },
+  });
+  const authUser = authUserData.user as AuthUserRecord | null;
+  const authUserId = typeof authUser?.id === "string" ? authUser.id : null;
+
+  if (authUserError || !authUserId) {
+    throw new Error("Impossible de creer le responsable d'agence.");
+  }
+
   const { data: profile, error: profileError } = await admin
     .from("profiles")
     .insert({
+      auth_user_id: authUserId,
       email: parsedInput.data.email,
       full_name: parsedInput.data.fullName,
       role: "agency_manager",
     })
-    .select("id,email,full_name,role")
+    .select("id,email,full_name,role,auth_user_id")
     .single();
 
   if (profileError || !profile) {
+    await admin.auth.admin.deleteUser(authUserId);
     throw new Error("Impossible de creer le responsable d'agence.");
   }
 
@@ -57,6 +78,7 @@ export async function createAgencyManager(input: {
 
   if (membershipError) {
     await admin.from("profiles").delete().eq("id", profile.id);
+    await admin.auth.admin.deleteUser(authUserId);
     throw new Error("Impossible de rattacher le responsable a l'agence.");
   }
 

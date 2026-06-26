@@ -60,42 +60,88 @@ function createServerClientWithoutClaims() {
   };
 }
 
-function createAdminClientForManagerCreation(insertedProfiles: Array<Record<string, unknown>>) {
+function createAdminClientForManagerCreation(options: {
+  insertedProfiles: Array<Record<string, unknown>>;
+  sequence?: string[];
+  membershipError?: unknown;
+  profileError?: unknown;
+}) {
+  const authUserId = "00000000-0000-0000-0000-000000000301";
+  const deleteUser = vi.fn(async (userId: string) => {
+    options.sequence?.push(`deleteUser:${userId}`);
+    return { data: { user: null }, error: null };
+  });
+  const profileDeleteEq = vi.fn(async (_column: string, value: string) => {
+    options.sequence?.push(`deleteProfile:${value}`);
+    return { error: null };
+  });
+  const profileDelete = vi.fn(() => ({
+    eq: profileDeleteEq,
+  }));
+  const profileInsert = vi.fn((payload: Record<string, unknown>) => {
+    options.sequence?.push("profileInsert");
+    options.insertedProfiles.push(payload);
+
+    return {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: options.profileError
+            ? null
+            : {
+                auth_user_id: payload.auth_user_id,
+                email: payload.email,
+                full_name: payload.full_name,
+                id: "00000000-0000-0000-0000-000000000201",
+                role: payload.role,
+              },
+          error: options.profileError ?? null,
+        })),
+      })),
+    };
+  });
+  const membershipInsert = vi.fn(async () => {
+    options.sequence?.push("membershipInsert");
+    return { error: options.membershipError ?? null };
+  });
+
   return {
+    auth: {
+      admin: {
+        createUser: vi.fn(async (payload: Record<string, unknown>) => {
+          options.sequence?.push("createUser");
+          return {
+            data: {
+              user: {
+                email: payload.email,
+                id: authUserId,
+              },
+            },
+            error: null,
+          };
+        }),
+        deleteUser,
+      },
+    },
     from: vi.fn((table: string) => {
       if (table === "profiles") {
         return {
-          delete: vi.fn(() => ({
-            eq: vi.fn(async () => ({ error: null })),
-          })),
-          insert: vi.fn((payload: Record<string, unknown>) => {
-            insertedProfiles.push(payload);
-
-            return {
-              select: vi.fn(() => ({
-                single: vi.fn(async () => ({
-                  data: {
-                    email: payload.email,
-                    full_name: payload.full_name,
-                    id: "00000000-0000-0000-0000-000000000201",
-                    role: payload.role,
-                  },
-                  error: null,
-                })),
-              })),
-            };
-          }),
+          delete: profileDelete,
+          insert: profileInsert,
         };
       }
 
       if (table === "agency_memberships") {
         return {
-          insert: vi.fn(async () => ({ error: null })),
+          insert: membershipInsert,
         };
       }
 
       throw new Error(`Unexpected table ${table}`);
     }),
+    deleteUser,
+    membershipInsert,
+    profileDeleteEq,
+    profileInsert,
   };
 }
 
@@ -161,9 +207,8 @@ describe("HR admin permissions", () => {
   it("normalizes padded uppercase emails before creating an agency manager", async () => {
     const insertedProfiles: Array<Record<string, unknown>> = [];
     supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
-    supabaseMocks.createAdminClient.mockReturnValue(
-      createAdminClientForManagerCreation(insertedProfiles),
-    );
+    const adminClient = createAdminClientForManagerCreation({ insertedProfiles });
+    supabaseMocks.createAdminClient.mockReturnValue(adminClient);
 
     const { createAgencyManager } = await import("../../lib/admin/users");
 
@@ -181,10 +226,100 @@ describe("HR admin permissions", () => {
 
     expect(insertedProfiles).toEqual([
       {
+        auth_user_id: "00000000-0000-0000-0000-000000000301",
         email: "manager@example.com",
         full_name: "Responsable Agence",
         role: "agency_manager",
       },
+    ]);
+    expect(adminClient.auth.admin.createUser).toHaveBeenCalledWith({
+      email: "manager@example.com",
+      email_confirm: true,
+      user_metadata: {
+        full_name: "Responsable Agence",
+        role: "agency_manager",
+      },
+    });
+  });
+
+  it("creates the auth user before profile and agency membership", async () => {
+    const insertedProfiles: Array<Record<string, unknown>> = [];
+    const sequence: string[] = [];
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
+    supabaseMocks.createAdminClient.mockReturnValue(
+      createAdminClientForManagerCreation({ insertedProfiles, sequence }),
+    );
+
+    const { createAgencyManager } = await import("../../lib/admin/users");
+
+    await createAgencyManager({
+      agencyId: "00000000-0000-0000-0000-000000000101",
+      email: "manager@example.com",
+      fullName: "Responsable Agence",
+    });
+
+    expect(sequence).toEqual(["createUser", "profileInsert", "membershipInsert"]);
+    expect(insertedProfiles[0]).toMatchObject({
+      auth_user_id: "00000000-0000-0000-0000-000000000301",
+    });
+  });
+
+  it("deletes the auth user when profile creation fails", async () => {
+    const insertedProfiles: Array<Record<string, unknown>> = [];
+    const sequence: string[] = [];
+    const adminClient = createAdminClientForManagerCreation({
+      insertedProfiles,
+      profileError: { message: "profile failed" },
+      sequence,
+    });
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
+    supabaseMocks.createAdminClient.mockReturnValue(adminClient);
+
+    const { createAgencyManager } = await import("../../lib/admin/users");
+
+    await expect(
+      createAgencyManager({
+        agencyId: "00000000-0000-0000-0000-000000000101",
+        email: "manager@example.com",
+        fullName: "Responsable Agence",
+      }),
+    ).rejects.toThrow("Impossible de creer le responsable d'agence.");
+
+    expect(sequence).toEqual([
+      "createUser",
+      "profileInsert",
+      "deleteUser:00000000-0000-0000-0000-000000000301",
+    ]);
+    expect(adminClient.membershipInsert).not.toHaveBeenCalled();
+  });
+
+  it("deletes profile and auth user when agency membership creation fails", async () => {
+    const insertedProfiles: Array<Record<string, unknown>> = [];
+    const sequence: string[] = [];
+    const adminClient = createAdminClientForManagerCreation({
+      insertedProfiles,
+      membershipError: { message: "membership failed" },
+      sequence,
+    });
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
+    supabaseMocks.createAdminClient.mockReturnValue(adminClient);
+
+    const { createAgencyManager } = await import("../../lib/admin/users");
+
+    await expect(
+      createAgencyManager({
+        agencyId: "00000000-0000-0000-0000-000000000101",
+        email: "manager@example.com",
+        fullName: "Responsable Agence",
+      }),
+    ).rejects.toThrow("Impossible de rattacher le responsable a l'agence.");
+
+    expect(sequence).toEqual([
+      "createUser",
+      "profileInsert",
+      "membershipInsert",
+      "deleteProfile:00000000-0000-0000-0000-000000000201",
+      "deleteUser:00000000-0000-0000-0000-000000000301",
     ]);
   });
 
