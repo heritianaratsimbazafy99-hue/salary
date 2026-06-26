@@ -567,7 +567,7 @@ describe("POST /api/imports", () => {
     );
   });
 
-  it("caps useful payroll rows at 2000 before parsing and persistence", async () => {
+  it("marks imports as failed when the worksheet exceeds 2000 useful payroll rows", async () => {
     const { db } = createAuthorizedImportClient();
     const rows = Array.from({ length: 2001 }, (_, index) => ({
       ...validPayrollRow,
@@ -584,22 +584,20 @@ describe("POST /api/imports", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         invalidRowCount: 0,
-        status: "READY_FOR_PREVIEW",
-        validRowCount: 2000,
+        status: "FAILED",
+        validRowCount: 0,
       },
     });
     expect(db.payroll_imports[0]).toMatchObject({
-      valid_row_count: 2000,
+      status: "FAILED",
+      valid_row_count: 0,
     });
-    expect(db.payroll_import_rows).toHaveLength(2000);
-    expect(db.payroll_import_rows).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ employee_id: "EMP-2001" })]),
-    );
+    expect(db.payroll_import_rows).toHaveLength(0);
     expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: "PAYROLL_IMPORT_COMPLETED",
+        action: "PAYROLL_IMPORT_FAILED",
         metadata: expect.objectContaining({
-          rowCount: 2000,
+          rowCount: 0,
         }),
       }),
     );

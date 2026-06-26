@@ -193,7 +193,11 @@ async function readPayrollWorksheetRows(file: File): Promise<RawRow[]> {
       headers.map((header, index) => [header, normalizeExcelCellValue(row.getCell(index + 1).value)]),
     );
 
-    if (rows.length < MAX_USEFUL_PAYROLL_ROWS && Object.values(rowObject).some(hasMeaningfulCellValue)) {
+    if (Object.values(rowObject).some(hasMeaningfulCellValue)) {
+      if (rows.length >= MAX_USEFUL_PAYROLL_ROWS) {
+        throw new PayrollImportParseError("Payroll worksheet exceeds the 2000 row limit.");
+      }
+
       rows.push(rowObject);
     }
   });
