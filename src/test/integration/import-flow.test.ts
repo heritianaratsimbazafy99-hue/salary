@@ -321,6 +321,27 @@ describe("POST /api/imports", () => {
     });
   });
 
+  it("returns 422 and does not persist or audit when the uploaded file is not Excel", async () => {
+    const { db } = createAuthorizedImportClient();
+    const formData = new FormData();
+    appendRequiredImportFields(
+      formData,
+      new File(["employee_id,email\nEMP-001,employee@example.com"], "payroll.txt", {
+        type: "text/plain",
+      }),
+    );
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(db.payroll_imports).toHaveLength(0);
+    expect(db.payroll_import_rows).toHaveLength(0);
+    expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
+  });
+
   it("returns 422 without parsing form data when content-length exceeds the upload limit and multipart overhead", async () => {
     createAuthorizedImportClient();
 
@@ -499,6 +520,88 @@ describe("POST /api/imports", () => {
           row_number: 3,
         }),
       ]),
+    );
+  });
+
+  it("records a line error when a row period does not match the submitted period", async () => {
+    const { db } = createAuthorizedImportClient();
+    db.employees.push({
+      agency_id: AGENCY_ID,
+      employee_id: "EMP-001",
+    });
+
+    const formData = new FormData();
+    appendRequiredImportFields(
+      formData,
+      await createPayrollFile([
+        validPayrollRow,
+        {
+          ...validPayrollRow,
+          employee_id: "EMP-002",
+          email: "employee-two@example.com",
+          period_end: "2026-07-31",
+        },
+      ]),
+    );
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        invalidRowCount: 1,
+        status: "READY_FOR_PREVIEW",
+        validRowCount: 1,
+      },
+    });
+    expect(db.payroll_import_rows).toHaveLength(1);
+    expect(db.payroll_import_errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          error_code: "period_mismatch",
+          field_name: "periodEnd",
+          import_id: "00000000-0000-0000-0000-100000000001",
+          row_number: 3,
+        }),
+      ]),
+    );
+  });
+
+  it("caps useful payroll rows at 2000 before parsing and persistence", async () => {
+    const { db } = createAuthorizedImportClient();
+    const rows = Array.from({ length: 2001 }, (_, index) => ({
+      ...validPayrollRow,
+      email: `employee-${index + 1}@example.com`,
+      employee_id: `EMP-${String(index + 1).padStart(4, "0")}`,
+    }));
+
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile(rows));
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        invalidRowCount: 0,
+        status: "READY_FOR_PREVIEW",
+        validRowCount: 2000,
+      },
+    });
+    expect(db.payroll_imports[0]).toMatchObject({
+      valid_row_count: 2000,
+    });
+    expect(db.payroll_import_rows).toHaveLength(2000);
+    expect(db.payroll_import_rows).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ employee_id: "EMP-2001" })]),
+    );
+    expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYROLL_IMPORT_COMPLETED",
+        metadata: expect.objectContaining({
+          rowCount: 2000,
+        }),
+      }),
     );
   });
 

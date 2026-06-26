@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isAppRole } from "@/lib/admin/permissions";
+import { recordAuditEvent } from "@/lib/audit/server";
 import { apiError } from "@/lib/errors";
 import { canCreateExport, type ExportType } from "@/lib/payroll/export";
 import type { AppRole } from "@/lib/roles";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,11 +36,18 @@ function getAgencyId(body: unknown): string | null | undefined {
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+type SupabaseWriteClient = Pick<ReturnType<typeof createAdminClient>, "from">;
 
 type ExportActor = {
   agencyId?: string | null;
   id: string;
   role: AppRole;
+};
+
+type ExportJobRecord = {
+  export_type?: unknown;
+  id?: unknown;
+  status?: unknown;
 };
 
 export async function POST(request: NextRequest) {
@@ -82,7 +91,79 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(apiError("FORBIDDEN", "Forbidden"), { status: 403 });
   }
 
-  return NextResponse.json({ data: { status: "PENDING", exportType } });
+  let exportJob;
+  try {
+    const admin = createAdminClient();
+    exportJob = await createExportJob(admin, {
+      actorProfileId: actor.id,
+      agencyId: agencyId ?? null,
+      exportType,
+    });
+
+    await recordAuditEvent({
+      action: "PAYROLL_EXPORT_REQUESTED",
+      actorProfileId: actor.id,
+      actorRole: actor.role,
+      agencyId: exportJob.agencyId,
+      metadata: {
+        agencyId: exportJob.agencyId,
+        exportJobId: exportJob.id,
+        exportType: exportJob.exportType,
+        status: exportJob.status,
+      },
+      resourceId: exportJob.id,
+      resourceType: "export_job",
+    });
+  } catch {
+    return NextResponse.json(apiError("INTERNAL_ERROR", "Unable to create export job"), {
+      status: 500,
+    });
+  }
+
+  return NextResponse.json({
+    data: {
+      exportJobId: exportJob.id,
+      exportType: exportJob.exportType,
+      status: exportJob.status,
+    },
+  });
+}
+
+async function createExportJob(
+  supabase: SupabaseWriteClient,
+  input: {
+    actorProfileId: string;
+    agencyId: string | null;
+    exportType: ExportType;
+  },
+) {
+  const { data, error } = await supabase
+    .from("export_jobs")
+    .insert({
+      agency_id: input.agencyId,
+      export_type: input.exportType,
+      requested_by: input.actorProfileId,
+      status: "PENDING",
+    })
+    .select("id,status,export_type")
+    .single();
+
+  const exportJob = data as ExportJobRecord | null;
+  if (
+    error ||
+    typeof exportJob?.id !== "string" ||
+    exportJob.status !== "PENDING" ||
+    !isExportType(exportJob.export_type)
+  ) {
+    throw new Error("Unable to create export job");
+  }
+
+  return {
+    agencyId: input.agencyId,
+    exportType: exportJob.export_type,
+    id: exportJob.id,
+    status: exportJob.status,
+  };
 }
 
 async function loadExportActor(

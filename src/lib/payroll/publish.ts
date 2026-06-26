@@ -10,6 +10,7 @@ type PayrollImportRecord = {
   id?: unknown;
   period_end?: unknown;
   period_start?: unknown;
+  status?: unknown;
 };
 
 type PayrollImportRowRecord = {
@@ -46,6 +47,11 @@ export type PublishImportResult = {
 };
 
 export class PublishNotFoundError extends Error {}
+export class PublishConflictError extends Error {
+  constructor(readonly status: string) {
+    super("Import cannot be published from its current status.");
+  }
+}
 
 export function nextVersionNumber(existingVersions: number[]) {
   if (existingVersions.length === 0) return 1;
@@ -71,6 +77,10 @@ export async function publishPayrollImport(input: {
     requestedAgencyId: payrollImport.agencyId,
     role: input.actor.role,
   });
+
+  if (payrollImport.status !== "READY_FOR_PREVIEW") {
+    throw new PublishConflictError(payrollImport.status);
+  }
 
   const importRows = await loadPayrollImportRows(
     input.readSupabase,
@@ -146,7 +156,8 @@ async function loadPayrollImport(supabase: SupabaseWriteClient, importId: string
   if (
     typeof payrollImport.agency_id !== "string" ||
     typeof payrollImport.period_start !== "string" ||
-    typeof payrollImport.period_end !== "string"
+    typeof payrollImport.period_end !== "string" ||
+    typeof payrollImport.status !== "string"
   ) {
     throw new Error("Import invalide.");
   }
@@ -155,6 +166,7 @@ async function loadPayrollImport(supabase: SupabaseWriteClient, importId: string
     agencyId: payrollImport.agency_id,
     periodEnd: payrollImport.period_end,
     periodStart: payrollImport.period_start,
+    status: payrollImport.status,
   };
 }
 

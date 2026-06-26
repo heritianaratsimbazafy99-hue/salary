@@ -2,7 +2,11 @@ import { apiError } from "@/lib/errors";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import { AUTH_REQUIRED_ERROR_MESSAGE, FORBIDDEN_ERROR_MESSAGE } from "@/lib/admin/permissions";
 import { recordAuditEvent } from "@/lib/audit/server";
-import { PublishNotFoundError, publishPayrollImport } from "@/lib/payroll/publish";
+import {
+  PublishConflictError,
+  PublishNotFoundError,
+  publishPayrollImport,
+} from "@/lib/payroll/publish";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
@@ -67,6 +71,13 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
 
     if (error instanceof PublishNotFoundError) {
       return NextResponse.json(apiError("NOT_FOUND", "Import not found"), { status: 404 });
+    }
+
+    if (error instanceof PublishConflictError) {
+      return NextResponse.json(
+        apiError("CONFLICT", "Import is not ready for publication", { status: error.status }),
+        { status: 409 },
+      );
     }
 
     return NextResponse.json(apiError("INTERNAL_ERROR", "Unable to publish payroll import"), {

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgencyScopedActor } from "@/lib/admin/auth";
 import { applyColumnMappings, type ColumnMapping } from "@/lib/payroll/mapping";
 import { parsePayrollRowsFromObjects } from "@/lib/payroll/parser";
-import { PAY_ITEM_CATEGORIES, type PayItemCategory } from "@/lib/payroll/schema";
+import { PAY_ITEM_CATEGORIES, type PayItemCategory, type PayrollRowError } from "@/lib/payroll/schema";
 
 export type ImportSummaryInput = {
   validRows: { employeeId: string }[];
@@ -29,6 +29,8 @@ export type PersistedPayrollImportSummary = ImportSummary & {
 
 type SupabaseWriteClient = Pick<SupabaseClient, "from">;
 type RawRow = Record<string, unknown>;
+
+const MAX_USEFUL_PAYROLL_ROWS = 2000;
 
 type ImportRecord = {
   id?: unknown;
@@ -92,13 +94,17 @@ export async function persistPayrollImport(input: {
   }
 
   const parseResult = parsePayrollRowsFromObjects(worksheetRows);
+  const periodValidationResult = validateRowsMatchImportPeriod(parseResult.validRows, {
+    periodEnd: input.periodEnd,
+    periodStart: input.periodStart,
+  });
   const mappings = await loadColumnMappings(input.supabase, input.agencyId);
   const mappedColumns = new Set(mappings.map((mapping) => mapping.sourceColumn));
   const unmappedUnknownColumns = parseResult.unknownColumns.filter((column) => !mappedColumns.has(column));
   const unknownEmployeeIds = await findUnknownEmployeeIds(
     input.supabase,
     input.agencyId,
-    parseResult.validRows.map((row) => row.data.employeeId),
+    periodValidationResult.validRows.map((row) => row.data.employeeId),
   );
   const status: PayrollImportStatus =
     unmappedUnknownColumns.length > 0 ? "NEEDS_MAPPING" : "READY_FOR_PREVIEW";
@@ -106,16 +112,16 @@ export async function persistPayrollImport(input: {
   const importId = await insertImportRecord(input.supabase, {
     agencyId: input.agencyId,
     filename,
-    invalidRowCount: parseResult.invalidRows.length,
+    invalidRowCount: parseResult.invalidRows.length + periodValidationResult.invalidRows.length,
     periodEnd: input.periodEnd,
     periodStart: input.periodStart,
     status,
     unknownEmployeeCount: unknownEmployeeIds.length,
     uploadedBy: input.actor.id,
-    validRowCount: parseResult.validRows.length,
+    validRowCount: periodValidationResult.validRows.length,
   });
 
-  const validImportRows = parseResult.validRows.map((row) => ({
+  const validImportRows = periodValidationResult.validRows.map((row) => ({
     agency_id: input.agencyId,
     employee_email: row.data.email.toLowerCase(),
     employee_id: row.data.employeeId,
@@ -134,7 +140,8 @@ export async function persistPayrollImport(input: {
     }
   }
 
-  const invalidImportErrors = parseResult.invalidRows.flatMap((row) =>
+  const invalidImportRows = [...parseResult.invalidRows, ...periodValidationResult.invalidRows];
+  const invalidImportErrors = invalidImportRows.flatMap((row) =>
     row.errors.map((error) => ({
       error_code: error.errorCode,
       field_name: error.fieldName,
@@ -154,12 +161,12 @@ export async function persistPayrollImport(input: {
 
   return {
     importId,
-    invalidRowCount: parseResult.invalidRows.length,
+    invalidRowCount: invalidImportRows.length,
     rowCount: worksheetRows.length,
     status,
     unknownColumns: unmappedUnknownColumns,
     unknownEmployeeCount: unknownEmployeeIds.length,
-    validRowCount: parseResult.validRows.length,
+    validRowCount: periodValidationResult.validRows.length,
   };
 }
 
@@ -186,12 +193,61 @@ async function readPayrollWorksheetRows(file: File): Promise<RawRow[]> {
       headers.map((header, index) => [header, normalizeExcelCellValue(row.getCell(index + 1).value)]),
     );
 
-    if (Object.values(rowObject).some(hasMeaningfulCellValue)) {
+    if (rows.length < MAX_USEFUL_PAYROLL_ROWS && Object.values(rowObject).some(hasMeaningfulCellValue)) {
       rows.push(rowObject);
     }
   });
 
   return rows;
+}
+
+function validateRowsMatchImportPeriod(
+  rows: ReturnType<typeof parsePayrollRowsFromObjects>["validRows"],
+  period: { periodEnd: string; periodStart: string },
+) {
+  const validRows: ReturnType<typeof parsePayrollRowsFromObjects>["validRows"] = [];
+  const invalidRows: Array<{
+    errors: PayrollRowError[];
+    raw: RawRow;
+    rowNumber: number;
+    status: "invalid";
+  }> = [];
+
+  rows.forEach((row) => {
+    const errors: PayrollRowError[] = [];
+
+    if (row.data.periodStart !== period.periodStart) {
+      errors.push({
+        errorCode: "period_mismatch",
+        fieldName: "periodStart",
+        message: "La periode de debut de la ligne ne correspond pas a la periode d'import.",
+        rawValue: row.data.periodStart,
+      });
+    }
+
+    if (row.data.periodEnd !== period.periodEnd) {
+      errors.push({
+        errorCode: "period_mismatch",
+        fieldName: "periodEnd",
+        message: "La periode de fin de la ligne ne correspond pas a la periode d'import.",
+        rawValue: row.data.periodEnd,
+      });
+    }
+
+    if (errors.length === 0) {
+      validRows.push(row);
+      return;
+    }
+
+    invalidRows.push({
+      errors,
+      raw: row.data,
+      rowNumber: row.rowNumber,
+      status: "invalid",
+    });
+  });
+
+  return { invalidRows, validRows };
 }
 
 function readHeaderRow(worksheet: ExcelJS.Worksheet): string[] {

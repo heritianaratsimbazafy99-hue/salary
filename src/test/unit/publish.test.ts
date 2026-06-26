@@ -252,13 +252,17 @@ function createPublishContext(importId: string) {
   };
 }
 
-function seedPublishImport(db: PublishTestDb, agencyId = AGENCY_ID) {
+function seedPublishImport(
+  db: PublishTestDb,
+  agencyId = AGENCY_ID,
+  status: string = "READY_FOR_PREVIEW",
+) {
   db.payroll_imports.push({
     agency_id: agencyId,
     id: IMPORT_ID,
     period_end: "2026-06-30",
     period_start: "2026-06-01",
-    status: "READY_FOR_PREVIEW",
+    status,
   });
 }
 
@@ -340,6 +344,35 @@ describe("POST /api/imports/:importId/publish", () => {
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
     expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
   });
+
+  it.each(["NEEDS_MAPPING", "FAILED", "PUBLISHED"] as const)(
+    "returns 409 and does not publish when the import status is %s",
+    async (status) => {
+      const { db } = createAuthorizedPublishClient();
+      seedPublishImport(db, AGENCY_ID, status);
+      db.payroll_import_rows.push({
+        agency_id: AGENCY_ID,
+        employee_email: "employee@example.com",
+        employee_id: "EMP-001",
+        employee_name: "Employee One",
+        import_id: IMPORT_ID,
+        normalized_data: { employeeId: "EMP-001", netAmount: 1100000 },
+        pay_items: [],
+      });
+
+      const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "CONFLICT" },
+      });
+      expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+      expect(db.payslip_versions).toHaveLength(0);
+      expect(db.notifications).toHaveLength(0);
+      expect(db.payroll_imports[0]).toMatchObject({ status });
+      expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
+    },
+  );
 
   it("publishes import rows into payslip versions, current pointers, notifications, and audit", async () => {
     const { db } = createAuthorizedPublishClient();

@@ -14,20 +14,40 @@ const supabaseMocks = vi.hoisted(() => ({
   createClient: vi.fn(),
 }));
 
+const adminMocks = vi.hoisted(() => ({
+  createAdminClient: vi.fn(),
+}));
+
+const auditMocks = vi.hoisted(() => ({
+  recordAuditEvent: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: supabaseMocks.createClient,
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: adminMocks.createAdminClient,
+}));
+
+vi.mock("@/lib/audit/server", () => ({
+  recordAuditEvent: auditMocks.recordAuditEvent,
 }));
 
 type ExportTableRow = Record<string, unknown>;
 
 type ExportTestDb = {
   agency_memberships: ExportTableRow[];
+  export_jobs: ExportTableRow[];
   profiles: ExportTableRow[];
 };
 
 function createExportDb(): ExportTestDb {
   return {
     agency_memberships: [],
+    export_jobs: [],
     profiles: [],
   };
 }
@@ -77,6 +97,17 @@ function createTableQuery(rows: ExportTableRow[]) {
     select() {
       return query;
     },
+    insert(payload: ExportTableRow | ExportTableRow[]) {
+      const payloadRows = Array.isArray(payload) ? payload : [payload];
+      const insertedRows = payloadRows.map((row, index) => ({
+        ...row,
+        id: row.id ?? `00000000-0000-0000-0000-80000000000${rows.length + index + 1}`,
+      }));
+
+      rows.push(...insertedRows);
+
+      return createMutationResult(insertedRows);
+    },
     single: async () => {
       const row = rows.find((candidate) => filters.every((filter) => filter(candidate)));
 
@@ -88,6 +119,21 @@ function createTableQuery(rows: ExportTableRow[]) {
   };
 
   return query;
+}
+
+function createMutationResult(rows: ExportTableRow[]) {
+  const result = Promise.resolve({ data: null, error: null });
+
+  return {
+    select() {
+      return {
+        single: async () => ({ data: rows[0] ?? null, error: null }),
+      };
+    },
+    then: result.then.bind(result),
+    catch: result.catch.bind(result),
+    finally: result.finally.bind(result),
+  };
 }
 
 function mockExportClient(options: {
@@ -105,6 +151,12 @@ function mockExportClient(options: {
 
   supabaseMocks.createClient.mockResolvedValue(client);
   return { client, db };
+}
+
+function mockAdminExportClient(db: ExportTestDb) {
+  const client = createSupabaseClient({ authUserId: null, db });
+  adminMocks.createAdminClient.mockReturnValue(client);
+  return client;
 }
 
 function createExportRequest(body: unknown) {
@@ -221,6 +273,8 @@ describe("canCreateExport", () => {
 
 describe("POST /api/exports", () => {
   beforeEach(() => {
+    adminMocks.createAdminClient.mockReset();
+    auditMocks.recordAuditEvent.mockReset();
     supabaseMocks.createClient.mockReset();
   });
 
@@ -233,6 +287,8 @@ describe("POST /api/exports", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "UNAUTHORIZED" },
     });
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+    expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
   it("returns 422 and VALIDATION_ERROR for invalid export types", async () => {
@@ -244,6 +300,8 @@ describe("POST /api/exports", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_ERROR" },
     });
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+    expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
   it.each(["", "   ", "not-a-uuid", 42] as const)(
@@ -257,6 +315,8 @@ describe("POST /api/exports", () => {
       await expect(response.json()).resolves.toMatchObject({
         error: { code: "VALIDATION_ERROR" },
       });
+      expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+      expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
     },
   );
 
@@ -269,6 +329,8 @@ describe("POST /api/exports", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_ERROR" },
     });
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+    expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -292,16 +354,49 @@ describe("POST /api/exports", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "FORBIDDEN" },
     });
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+    expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
-  it("returns pending export metadata for authorized valid requests", async () => {
-    mockExportClient({ actorRole: "hr_central" });
+  it("persists an export job and audits authorized valid requests", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    const adminClient = mockAdminExportClient(db);
 
     const response = await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { status: "PENDING", exportType: "PUBLISHED_PAYSLIPS" },
+      data: {
+        exportJobId: "00000000-0000-0000-0000-800000000001",
+        exportType: "PUBLISHED_PAYSLIPS",
+        status: "PENDING",
+      },
     });
+    expect(adminMocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(adminClient.from).toHaveBeenCalledWith("export_jobs");
+    expect(db.export_jobs).toEqual([
+      expect.objectContaining({
+        agency_id: null,
+        export_type: "PUBLISHED_PAYSLIPS",
+        requested_by: ACTOR_PROFILE_ID,
+        status: "PENDING",
+      }),
+    ]);
+    expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYROLL_EXPORT_REQUESTED",
+        actorProfileId: ACTOR_PROFILE_ID,
+        actorRole: "hr_central",
+        agencyId: null,
+        metadata: {
+          agencyId: null,
+          exportJobId: "00000000-0000-0000-0000-800000000001",
+          exportType: "PUBLISHED_PAYSLIPS",
+          status: "PENDING",
+        },
+        resourceId: "00000000-0000-0000-0000-800000000001",
+        resourceType: "export_job",
+      }),
+    );
   });
 });
