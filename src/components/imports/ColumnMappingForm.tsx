@@ -11,20 +11,22 @@ export function ColumnMappingForm({ unknownColumns }: Props) {
 
   return (
     <form className="space-y-4">
-      {unknownColumns.map((column) => {
-        const labelId = `label:${column}`;
-        const categoryId = `category:${column}`;
+      {unknownColumns.map((column, index) => {
+        const labelId = `mapping-${index}-label`;
+        const categoryId = `mapping-${index}-category`;
+        const fieldName = `mappings.${index}`;
 
         return (
           <fieldset key={column} className="grid gap-2 rounded border border-border p-4 md:grid-cols-3">
             <legend className="px-1 text-sm font-medium">{column}</legend>
+            <input name={`${fieldName}.sourceColumn`} type="hidden" value={column} />
             <label className="text-sm" htmlFor={labelId}>
               Libelle
               <input
                 className="mt-1 w-full rounded border border-border px-3 py-2"
                 defaultValue={column}
                 id={labelId}
-                name={labelId}
+                name={`${fieldName}.label`}
               />
             </label>
             <label className="text-sm" htmlFor={categoryId}>
@@ -32,7 +34,7 @@ export function ColumnMappingForm({ unknownColumns }: Props) {
               <select
                 className="mt-1 w-full rounded border border-border px-3 py-2"
                 id={categoryId}
-                name={categoryId}
+                name={`${fieldName}.category`}
               >
                 {PAY_ITEM_CATEGORIES.map((category) => (
                   <option key={category} value={category}>
