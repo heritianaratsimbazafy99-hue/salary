@@ -82,6 +82,7 @@ describe("buildPayslipPublishedEmail", () => {
 describe("GET /api/notifications/test", () => {
   beforeEach(() => {
     supabaseMocks.createClient.mockReset();
+    vi.unstubAllEnvs();
   });
 
   it("returns 401 and UNAUTHORIZED for unauthenticated requests", async () => {
@@ -109,5 +110,17 @@ describe("GET /api/notifications/test", () => {
         html: expect.stringContaining("Exemple"),
       },
     });
+  });
+
+  it("returns 404 in production before touching Supabase", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const response = await GET();
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "NOT_FOUND" },
+    });
+    expect(supabaseMocks.createClient).not.toHaveBeenCalled();
   });
 });

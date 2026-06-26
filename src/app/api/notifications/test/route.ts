@@ -8,6 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 const DEFAULT_APP_URL = "http://localhost:3000";
 
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(apiError("NOT_FOUND", "Not found"), { status: 404 });
+  }
+
   const supabase = await createClient();
   const { data: userResult } = await supabase.auth.getUser();
 
