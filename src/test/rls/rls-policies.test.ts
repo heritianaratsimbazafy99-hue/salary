@@ -97,7 +97,7 @@ function canPublish(input: PolicyCase): boolean {
   );
 }
 
-function canUpdatePayslip(_input: PolicyCase): boolean {
+function canUpdatePayslip(): boolean {
   return false;
 }
 
