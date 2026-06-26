@@ -10,7 +10,11 @@ type AuditLog = {
 
 export function AuditLogTable({ logs }: { logs: AuditLog[] }) {
   if (logs.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucun evenement d&apos;audit.</p>;
+    return (
+      <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+        Aucun evenement d&apos;audit.
+      </p>
+    );
   }
 
   return (

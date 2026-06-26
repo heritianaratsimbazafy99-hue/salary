@@ -5,15 +5,17 @@ export function PayrollAnalytics({ rows }: { rows: PayrollAnalyticsRow[] }) {
   const summary = summarizeAnalytics(rows);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5">
       <p className="text-sm text-muted-foreground">Acces reserve RH centrale et super admin.</p>
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric label="Brut total" value={summary.grossTotal} />
-        <Metric label="Net total" value={summary.netTotal} />
-        <Metric label="Lignes salaries" value={summary.employeeRows} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <Metric label="Brut total" value={formatMga(summary.grossTotal)} />
+        <Metric label="Net total" value={formatMga(summary.netTotal)} accent />
+        <Metric label="Lignes salaries" value={summary.employeeRows.toLocaleString("fr-MG")} />
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune ligne analytique disponible.</p>
+        <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+          Aucune ligne analytique disponible.
+        </p>
       ) : (
         <Table aria-label="Lignes analytics paie">
           <TableHeader>
@@ -49,11 +51,23 @@ export function PayrollAnalytics({ rows }: { rows: PayrollAnalyticsRow[] }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="rounded border border-border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={`mt-2 font-display text-2xl font-bold tabular-nums ${accent ? "text-primary" : "text-foreground"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

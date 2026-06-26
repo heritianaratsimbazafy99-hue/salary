@@ -53,13 +53,13 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
         const fieldName = `mappings.${index}`;
 
         return (
-          <fieldset key={column} className="grid gap-2 rounded border border-border p-4 md:grid-cols-3">
-            <legend className="px-1 text-sm font-medium">{column}</legend>
+          <fieldset key={column} className="grid gap-2 rounded-xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)] md:grid-cols-3">
+            <legend className="px-1 font-display text-sm font-semibold">{column}</legend>
             <input name={`${fieldName}.sourceColumn`} type="hidden" value={column} />
             <label className="text-sm" htmlFor={labelId}>
               Libelle
               <input
-                className="mt-1 w-full rounded border border-border px-3 py-2"
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25"
                 defaultValue={column}
                 id={labelId}
                 name={`${fieldName}.displayLabel`}
@@ -68,7 +68,7 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
             <label className="text-sm" htmlFor={categoryId}>
               Categorie
               <select
-                className="mt-1 w-full rounded border border-border px-3 py-2"
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25"
                 id={categoryId}
                 name={`${fieldName}.targetCategory`}
                 defaultValue="OTHER_ELEMENTS"

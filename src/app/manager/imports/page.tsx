@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 
 import { PayrollImportUploadForm } from "@/components/imports/PayrollImportUploadForm";
 import { UploadStepper } from "@/components/imports/UploadStepper";
+import { AccessDenied } from "@/components/shell/AccessDenied";
+import { PageHeader } from "@/components/shell/PageHeader";
 import {
   Table,
   TableBody,
@@ -53,21 +55,19 @@ export default async function ManagerImportsPage() {
   const imports = await loadManagerImports(supabase, actor.agencyId);
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
-      <header>
-        <p className="text-sm text-muted-foreground">Espace manager</p>
-        <h1 className="mt-2 text-2xl font-semibold">Imports de paie</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence.
-        </p>
-      </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
+      <PageHeader
+        eyebrow="Espace manager"
+        title="Imports de paie"
+        description="Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence."
+      />
 
       <UploadStepper currentStep={0} />
       <PayrollImportUploadForm agencyId={actor.agencyId} />
 
       <section aria-labelledby="manager-imports-list-title" className="grid gap-4">
         <div>
-          <h2 className="text-base font-semibold" id="manager-imports-list-title">
+          <h2 className="font-display text-base font-semibold" id="manager-imports-list-title">
             Derniers imports
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -114,7 +114,7 @@ export default async function ManagerImportsPage() {
             </TableBody>
           </Table>
         ) : (
-          <p className="rounded-md border border-border px-4 py-6 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
             Aucun import n&apos;a encore ete charge pour votre agence.
           </p>
         )}
@@ -200,15 +200,7 @@ async function loadManagerImports(
 }
 
 function ForbiddenManagerAccess() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-10">
-      <p className="text-sm font-medium text-muted-foreground">Espace manager</p>
-      <h1 className="mt-3 text-2xl font-semibold">Acces refuse</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Votre role ne permet pas d&apos;ouvrir cette page.
-      </p>
-    </main>
-  );
+  return <AccessDenied context="Espace manager" />;
 }
 
 function hasErrorMessage(error: unknown, message: string): error is Error {

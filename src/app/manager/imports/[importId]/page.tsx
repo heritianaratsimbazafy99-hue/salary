@@ -5,6 +5,8 @@ import { ImportReport } from "@/components/imports/ImportReport";
 import { PayslipPreviewTable } from "@/components/imports/PayslipPreviewTable";
 import { PublishImportButton } from "@/components/imports/PublishImportButton";
 import { UploadStepper } from "@/components/imports/UploadStepper";
+import { AccessDenied } from "@/components/shell/AccessDenied";
+import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
@@ -109,19 +111,17 @@ export default async function ImportDetailPage({ params }: PageProps) {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
-      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">Espace manager</p>
-          <h1 className="mt-2 text-2xl font-semibold">Rapport d&apos;import</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {payrollImport.sourceFilename} - {payrollImport.periodStart} - {payrollImport.periodEnd}
-          </p>
-        </div>
-        {payrollImport.status === "READY_FOR_PREVIEW" ? (
-          <PublishImportButton importId={payrollImport.id} />
-        ) : null}
-      </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
+      <PageHeader
+        eyebrow="Espace manager"
+        title="Rapport d'import"
+        description={`${payrollImport.sourceFilename} · ${payrollImport.periodStart} – ${payrollImport.periodEnd}`}
+        actions={
+          payrollImport.status === "READY_FOR_PREVIEW" ? (
+            <PublishImportButton importId={payrollImport.id} />
+          ) : undefined
+        }
+      />
 
       <UploadStepper currentStep={currentStepForStatus(payrollImport.status)} />
       <ImportReport
@@ -134,7 +134,7 @@ export default async function ImportDetailPage({ params }: PageProps) {
       {payrollImport.status === "NEEDS_MAPPING" ? (
         <section aria-labelledby="mapping-title" className="grid gap-4">
           <div>
-            <h2 className="text-base font-semibold" id="mapping-title">
+            <h2 className="font-display text-base font-semibold" id="mapping-title">
               Mapping des colonnes
             </h2>
           </div>
@@ -144,7 +144,7 @@ export default async function ImportDetailPage({ params }: PageProps) {
 
       <section aria-labelledby="preview-title" className="grid gap-4">
         <div>
-          <h2 className="text-base font-semibold" id="preview-title">
+          <h2 className="font-display text-base font-semibold" id="preview-title">
             Previsualisation
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -333,15 +333,7 @@ async function loadPayrollImportRows(
 }
 
 function ForbiddenManagerAccess() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-10">
-      <p className="text-sm font-medium text-muted-foreground">Espace manager</p>
-      <h1 className="mt-3 text-2xl font-semibold">Acces refuse</h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Votre role ne permet pas d&apos;ouvrir cette page.
-      </p>
-    </main>
-  );
+  return <AccessDenied context="Espace manager" />;
 }
 
 function hasErrorMessage(error: unknown, message: string): error is Error {

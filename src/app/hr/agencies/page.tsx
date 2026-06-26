@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 
+import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -38,17 +39,15 @@ export default async function AgenciesPage() {
   const agencies = await listAgencies();
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
-      <header>
-        <p className="text-sm text-muted-foreground">Administration RH</p>
-        <h1 className="mt-2 text-2xl font-semibold">Agences</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Creation et suivi des agences actives de la plateforme.
-        </p>
-      </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
+      <PageHeader
+        eyebrow="Administration RH"
+        title="Agences"
+        description="Creation et suivi des agences actives de la plateforme."
+      />
 
-      <section aria-labelledby="create-agency-title" className="border-t border-border pt-6">
-        <h2 className="text-base font-semibold" id="create-agency-title">
+      <section aria-labelledby="create-agency-title" className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
+        <h2 className="font-display text-base font-semibold" id="create-agency-title">
           Nouvelle agence
         </h2>
         <form action={createAgencyAction} className="mt-4 grid gap-4 md:grid-cols-[1fr_12rem_auto] md:items-end">
@@ -73,7 +72,7 @@ export default async function AgenciesPage() {
 
       <section aria-labelledby="agencies-list-title" className="grid gap-4">
         <div>
-          <h2 className="text-base font-semibold" id="agencies-list-title">
+          <h2 className="font-display text-base font-semibold" id="agencies-list-title">
             Liste des agences
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -101,7 +100,7 @@ export default async function AgenciesPage() {
             </TableBody>
           </Table>
         ) : (
-          <p className="rounded-md border border-border px-4 py-6 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
             Aucune agence n&apos;est encore enregistree.
           </p>
         )}

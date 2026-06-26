@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 
+import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -40,17 +41,15 @@ export default async function UsersPage() {
   const hasAgencies = agencies.length > 0;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
-      <header>
-        <p className="text-sm text-muted-foreground">Administration RH</p>
-        <h1 className="mt-2 text-2xl font-semibold">Responsables d&apos;agence</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Creation des responsables et affectation a une agence active.
-        </p>
-      </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6">
+      <PageHeader
+        eyebrow="Administration RH"
+        title="Responsables d'agence"
+        description="Creation des responsables et affectation a une agence active."
+      />
 
-      <section aria-labelledby="create-manager-title" className="border-t border-border pt-6">
-        <h2 className="text-base font-semibold" id="create-manager-title">
+      <section aria-labelledby="create-manager-title" className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
+        <h2 className="font-display text-base font-semibold" id="create-manager-title">
           Nouveau responsable
         </h2>
         <form action={createAgencyManagerAction} className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_16rem_auto] lg:items-end">
@@ -74,7 +73,7 @@ export default async function UsersPage() {
               Agence
             </label>
             <select
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-[var(--shadow-xs)] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={!hasAgencies}
               id="agencyId"
               name="agencyId"
@@ -99,7 +98,7 @@ export default async function UsersPage() {
           </Button>
         </form>
         {!hasAgencies ? (
-          <p className="mt-4 rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
+          <p className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
             Creez d&apos;abord une agence avant d&apos;ajouter un responsable.
           </p>
         ) : null}
@@ -107,7 +106,7 @@ export default async function UsersPage() {
 
       <section aria-labelledby="agency-reference-title" className="grid gap-4">
         <div>
-          <h2 className="text-base font-semibold" id="agency-reference-title">
+          <h2 className="font-display text-base font-semibold" id="agency-reference-title">
             Agences disponibles
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -135,7 +134,7 @@ export default async function UsersPage() {
             </TableBody>
           </Table>
         ) : (
-          <p className="rounded-md border border-border px-4 py-6 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
             Aucune agence n&apos;est encore disponible pour affectation.
           </p>
         )}
