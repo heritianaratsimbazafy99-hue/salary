@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -9,6 +9,11 @@ const rlsMigrationSql = readFileSync("supabase/migrations/202606260002_rls_polic
 const coreSchemaSql = readFileSync("supabase/migrations/202606260001_core_schema.sql", "utf8")
   .replace(/\s+/g, " ")
   .toLowerCase();
+
+const reportingViewsPath = "supabase/migrations/202606260003_reporting_views.sql";
+const reportingViewsSql = existsSync(reportingViewsPath)
+  ? readFileSync(reportingViewsPath, "utf8").replace(/\s+/g, " ").toLowerCase()
+  : "";
 
 const authenticatedGrantStatements = rlsMigrationSql.match(/grant\s+[^;]+to\s+authenticated;/g) ?? [];
 const payslipVersionsTableSql = coreSchemaSql.match(
@@ -113,6 +118,10 @@ function canCreateImportRow(input: PolicyCase): boolean {
 }
 
 function canReadAuditLogs(actorRole: string): boolean {
+  return actorRole === "hr_central" || actorRole === "super_admin";
+}
+
+function canReadPayrollAnalytics(actorRole: string): boolean {
   return actorRole === "hr_central" || actorRole === "super_admin";
 }
 
@@ -350,6 +359,27 @@ describe("RLS policy model", () => {
     expect(canReadAuditLogs("super_admin")).toBe(true);
     expect(canReadAuditLogs("agency_manager")).toBe(false);
     expect(canReadAuditLogs("employee")).toBe(false);
+  });
+
+  it("keeps payroll analytics view behind global-reader filtering and explicit grants", () => {
+    expect(reportingViewsSql).toContain(
+      "create view public.payroll_analytics_rows with (security_invoker = true)",
+    );
+    expect(reportingViewsSql).toContain("where public.is_global_reader()");
+    expect(reportingViewsSql).toContain(
+      "revoke all on table public.payroll_analytics_rows from public, anon, authenticated;",
+    );
+    expect(reportingViewsSql).toContain(
+      "grant select on table public.payroll_analytics_rows to authenticated, service_role;",
+    );
+    expect(reportingViewsSql).not.toMatch(
+      /grant\s+select\s+on\s+table\s+public\.payroll_analytics_rows\s+to\s+anon\b/,
+    );
+
+    expect(canReadPayrollAnalytics("hr_central")).toBe(true);
+    expect(canReadPayrollAnalytics("super_admin")).toBe(true);
+    expect(canReadPayrollAnalytics("agency_manager")).toBe(false);
+    expect(canReadPayrollAnalytics("employee")).toBe(false);
   });
 
   it("denies non-employee roles the employee-owned branch even when profile-linked", () => {
