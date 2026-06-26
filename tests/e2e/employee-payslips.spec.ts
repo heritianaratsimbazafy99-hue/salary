@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("employee payslip page renders current payslip shell", async ({ page }) => {
+test("anonymous user is sent to login instead of the employee payslip space", async ({ page }) => {
   await page.goto("/employee/payslips");
-  await expect(page.getByRole("heading", { name: "Mes fiches de paie" })).toBeVisible();
-  await expect(page.getByText("Version actuellement publiee")).toBeVisible();
-  await expect(page.getByText("Aucun element de paie publie pour cette periode.")).toBeVisible();
+  await expect(page).toHaveURL(/\/auth\/login/);
+  await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mes fiches de paie" })).not.toBeVisible();
 });
