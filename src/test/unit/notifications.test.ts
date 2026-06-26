@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "@/app/api/notifications/test/route";
+import * as resendNotifications from "@/lib/notifications/resend";
 import { buildPayslipPublishedEmail } from "@/lib/notifications/resend";
 
 const supabaseMocks = vi.hoisted(() => ({
@@ -52,6 +53,29 @@ describe("buildPayslipPublishedEmail", () => {
 
     expect(email.html).toContain('href="http://localhost:3000/employee/payslips"');
     expect(email.html).not.toContain("javascript:");
+  });
+
+  it("falls back for non-local HTTP app URLs", () => {
+    const email = buildPayslipPublishedEmail({
+      employeeName: "Employee One",
+      appUrl: "http://evil.example.com",
+    });
+
+    expect(email.html).toContain('href="http://localhost:3000/employee/payslips"');
+    expect(email.html).not.toContain("evil.example.com");
+  });
+
+  it("allows local HTTP app URLs for development", () => {
+    const email = buildPayslipPublishedEmail({
+      employeeName: "Employee One",
+      appUrl: "http://localhost:3000",
+    });
+
+    expect(email.html).toContain('href="http://localhost:3000/employee/payslips"');
+  });
+
+  it("keeps server email sending out of the template module", () => {
+    expect(resendNotifications).not.toHaveProperty("sendPayslipPublishedEmail");
   });
 });
 
