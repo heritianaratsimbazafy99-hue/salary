@@ -19,6 +19,19 @@ export function canReadPayrollAnalytics(role: AppRole): boolean {
   return role === "hr_central" || role === "super_admin";
 }
 
+export function canManagePayrollForAgency(input: {
+  role: AppRole;
+  actorAgencyId?: string | null;
+  requestedAgencyId?: string | null;
+}): boolean {
+  return (
+    input.role === "agency_manager" &&
+    hasAgencyId(input.actorAgencyId) &&
+    hasAgencyId(input.requestedAgencyId) &&
+    input.actorAgencyId === input.requestedAgencyId
+  );
+}
+
 export function assertCanManageAgencies(role: AppRole): void {
   if (!canManageAgencies(role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
@@ -35,4 +48,18 @@ export function assertCanReadPayrollAnalytics(role: AppRole): void {
   if (!canReadPayrollAnalytics(role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
   }
+}
+
+export function assertCanManagePayrollForAgency(input: {
+  role: AppRole;
+  actorAgencyId?: string | null;
+  requestedAgencyId?: string | null;
+}): void {
+  if (!canManagePayrollForAgency(input)) {
+    throw new Error(FORBIDDEN_ERROR_MESSAGE);
+  }
+}
+
+function hasAgencyId(agencyId: string | null | undefined): agencyId is string {
+  return typeof agencyId === "string" && agencyId.trim().length > 0;
 }
