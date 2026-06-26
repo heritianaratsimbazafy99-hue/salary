@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { buildMagicLinkOtpOptions } from "@/lib/auth/magic-link";
 import { getPublicSupabaseConfig } from "@/lib/env.public";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -82,9 +83,7 @@ async function requestMagicLink(formData: FormData) {
 
   const { error } = await supabase.auth.signInWithOtp({
     email: result.data.email,
-    options: {
-      emailRedirectTo: `${appUrl}/auth/callback`,
-    },
+    options: buildMagicLinkOtpOptions(appUrl),
   });
 
   if (error) {

@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+function noStoreRedirect(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate, max-age=0");
+  response.headers.set("Expires", "0");
+  response.headers.set("Pragma", "no-cache");
+
+  return response;
+}
+
 function loginRedirect(request: NextRequest, error: string): NextResponse {
-  return NextResponse.redirect(new URL(`/auth/login?error=${error}`, request.url));
+  return noStoreRedirect(NextResponse.redirect(new URL(`/auth/login?error=${error}`, request.url)));
 }
 
 export async function GET(request: NextRequest) {
@@ -27,5 +35,5 @@ export async function GET(request: NextRequest) {
     return loginRedirect(request, "callback_failed");
   }
 
-  return NextResponse.redirect(new URL("/", request.url));
+  return noStoreRedirect(NextResponse.redirect(new URL("/", request.url)));
 }
