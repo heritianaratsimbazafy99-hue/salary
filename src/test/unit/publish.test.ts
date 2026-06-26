@@ -19,6 +19,10 @@ const supabaseMocks = vi.hoisted(() => ({
   createClient: vi.fn(),
 }));
 
+const adminMocks = vi.hoisted(() => ({
+  createAdminClient: vi.fn(),
+}));
+
 const auditMocks = vi.hoisted(() => ({
   recordAuditEvent: vi.fn(),
 }));
@@ -27,6 +31,10 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: supabaseMocks.createClient,
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: adminMocks.createAdminClient,
 }));
 
 vi.mock("@/lib/audit/server", () => ({
@@ -228,6 +236,12 @@ function createAuthorizedPublishClient(options: {
   return { client, db };
 }
 
+function createAdminPublishClient(db: PublishTestDb) {
+  const client = createSupabaseClient({ authUserId: null, db });
+  adminMocks.createAdminClient.mockReturnValue(client);
+  return client;
+}
+
 function createPublishRequest() {
   return {} as NextRequest;
 }
@@ -260,6 +274,7 @@ describe("nextVersionNumber", () => {
 
 describe("POST /api/imports/:importId/publish", () => {
   beforeEach(() => {
+    adminMocks.createAdminClient.mockReset();
     supabaseMocks.createClient.mockReset();
     auditMocks.recordAuditEvent.mockReset();
   });
@@ -273,6 +288,7 @@ describe("POST /api/imports/:importId/publish", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "UNAUTHORIZED" },
     });
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
   });
 
   it.each(["", "   ", "not-a-uuid"])(
@@ -286,6 +302,7 @@ describe("POST /api/imports/:importId/publish", () => {
       await expect(response.json()).resolves.toMatchObject({
         error: { code: "VALIDATION_ERROR" },
       });
+      expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
     },
   );
 
@@ -304,6 +321,7 @@ describe("POST /api/imports/:importId/publish", () => {
       expect(db.payslip_versions).toHaveLength(0);
       expect(db.notifications).toHaveLength(0);
       expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
+      expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
     },
   );
 
@@ -320,10 +338,12 @@ describe("POST /api/imports/:importId/publish", () => {
     expect(db.payslip_versions).toHaveLength(0);
     expect(db.notifications).toHaveLength(0);
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
   });
 
   it("publishes import rows into payslip versions, current pointers, notifications, and audit", async () => {
     const { db } = createAuthorizedPublishClient();
+    const adminClient = createAdminPublishClient(db);
     seedPublishImport(db);
     db.employees.push({
       agency_id: AGENCY_ID,
@@ -384,6 +404,8 @@ describe("POST /api/imports/:importId/publish", () => {
         status: "PUBLISHED",
       },
     });
+    expect(adminMocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(adminClient.from).toHaveBeenCalledWith("notifications");
 
     expect(db.payroll_imports[0]).toMatchObject({ status: "PUBLISHED" });
     expect(db.employees).toEqual(

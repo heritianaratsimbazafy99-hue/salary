@@ -60,10 +60,11 @@ export type PublishResult = {
 
 export async function publishPayrollImport(input: {
   actor: AgencyScopedActor;
+  createWriteSupabase: () => SupabaseWriteClient;
   importId: string;
-  supabase: SupabaseWriteClient;
+  readSupabase: SupabaseWriteClient;
 }): Promise<PublishImportResult> {
-  const payrollImport = await loadPayrollImport(input.supabase, input.importId);
+  const payrollImport = await loadPayrollImport(input.readSupabase, input.importId);
 
   assertCanManagePayrollForAgency({
     actorAgencyId: input.actor.agencyId,
@@ -71,18 +72,23 @@ export async function publishPayrollImport(input: {
     role: input.actor.role,
   });
 
-  const importRows = await loadPayrollImportRows(input.supabase, input.importId, payrollImport.agencyId);
+  const importRows = await loadPayrollImportRows(
+    input.readSupabase,
+    input.importId,
+    payrollImport.agencyId,
+  );
+  const writeSupabase = input.createWriteSupabase();
 
   for (const row of importRows) {
-    const employee = await upsertEmployee(input.supabase, payrollImport.agencyId, row);
-    const payslip = await getOrCreatePayslip(input.supabase, {
+    const employee = await upsertEmployee(writeSupabase, payrollImport.agencyId, row);
+    const payslip = await getOrCreatePayslip(writeSupabase, {
       actorProfileId: input.actor.id,
       agencyId: payrollImport.agencyId,
       employeeId: employee.id,
       periodEnd: payrollImport.periodEnd,
       periodStart: payrollImport.periodStart,
     });
-    const version = await createPayslipVersion(input.supabase, {
+    const version = await createPayslipVersion(writeSupabase, {
       actorProfileId: input.actor.id,
       agencyId: payrollImport.agencyId,
       currentVersionId: payslip.currentVersionId,
@@ -92,20 +98,20 @@ export async function publishPayrollImport(input: {
       payslipId: payslip.id,
     });
 
-    await updatePayslipCurrentVersion(input.supabase, {
+    await updatePayslipCurrentVersion(writeSupabase, {
       actorProfileId: input.actor.id,
       agencyId: payrollImport.agencyId,
       payslipId: payslip.id,
       versionId: version.versionId,
     });
 
-    await createPayslipNotification(input.supabase, {
+    await createPayslipNotification(writeSupabase, {
       employee,
       payslipId: payslip.id,
     });
   }
 
-  const { error } = await input.supabase
+  const { error } = await writeSupabase
     .from("payroll_imports")
     .update({ status: "PUBLISHED" })
     .eq("id", input.importId)
