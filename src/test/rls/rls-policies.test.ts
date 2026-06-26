@@ -361,14 +361,7 @@ describe("RLS policy model", () => {
   });
 
   it("denies direct payslip updates by managers", () => {
-    expect(
-      canUpdatePayslip({
-        actorRole: "agency_manager",
-        actorProfileId: "profile_manager",
-        actorAgencyId: "agency_1",
-        resourceAgencyId: "agency_1",
-      }),
-    ).toBe(false);
+    expect(canUpdatePayslip()).toBe(false);
   });
 
   it("denies manager payslip version creation from another agency import", () => {
