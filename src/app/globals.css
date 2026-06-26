@@ -3,26 +3,33 @@
 @source inline("{bg-background,bg-muted,bg-primary,bg-surface,bg-surface-elevated,bg-accent,bg-success,bg-warning,bg-danger,text-foreground,text-muted-foreground,text-primary,text-primary-foreground,text-accent-foreground,text-success,text-warning,text-danger,border-border}");
 
 :root {
-  --background: 48 42% 97%;
-  --foreground: 218 36% 12%;
-  --muted: 45 35% 93%;
-  --muted-foreground: 219 13% 42%;
-  --border: 40 20% 84%;
+  /* ----------------------------------------------------------------------
+     Brand palette — aligned to the Madajob logo:
+     · primary  = the steel/navy blue (trust, the dominant action colour)
+     · accent   = the lime green (energy, "opportunity", positive money cues)
+     A cool, near-white neutral base keeps the two brand colours crisp and
+     reads as professional fintech rather than warm/editorial.
+  ---------------------------------------------------------------------- */
+  --background: 210 38% 98%;
+  --foreground: 213 41% 14%;
+  --muted: 211 32% 93%;
+  --muted-foreground: 213 16% 43%;
+  --border: 214 28% 87%;
   --surface: 0 0% 100%;
-  --surface-elevated: 48 45% 98%;
-  --primary: 177 74% 26%;
+  --surface-elevated: 210 44% 99%;
+  --primary: 206 64% 32%;
   --primary-foreground: 0 0% 100%;
-  --primary-strong: 178 78% 20%;
-  --accent: 33 92% 54%;
-  --accent-foreground: 30 48% 13%;
-  --success: 151 58% 36%;
-  --warning: 39 90% 48%;
-  --danger: 0 75% 55%;
+  --primary-strong: 209 70% 24%;
+  --accent: 83 60% 45%;
+  --accent-foreground: 95 70% 11%;
+  --success: 152 56% 37%;
+  --warning: 38 92% 50%;
+  --danger: 0 72% 53%;
 
-  /* Deep brand surface used for hero / reassurance panels */
-  --ink: 192 60% 9%;
-  --ink-foreground: 180 30% 96%;
-  --ink-muted: 185 18% 70%;
+  /* Deep brand surface used for hero / reassurance panels — logo navy */
+  --ink: 212 54% 11%;
+  --ink-foreground: 205 38% 96%;
+  --ink-muted: 205 22% 72%;
 
   /* Radius scale */
   --radius-sm: 0.5rem;
@@ -30,11 +37,11 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
 
-  /* Elevation scale (tuned to warm foreground) */
-  --shadow-xs: 0 1px 2px hsl(var(--foreground) / 0.06);
+  /* Elevation scale (tuned to the cool navy foreground) */
+  --shadow-xs: 0 1px 2px hsl(var(--primary) / 0.06);
   --shadow-sm: 0 1px 3px hsl(var(--foreground) / 0.08), 0 1px 2px hsl(var(--foreground) / 0.04);
-  --shadow-md: 0 8px 24px -12px hsl(var(--foreground) / 0.18), 0 2px 6px -2px hsl(var(--foreground) / 0.08);
-  --shadow-lg: 0 28px 60px -32px hsl(var(--primary) / 0.32), 0 8px 24px -12px hsl(var(--foreground) / 0.14);
+  --shadow-md: 0 10px 28px -14px hsl(var(--primary) / 0.22), 0 2px 6px -2px hsl(var(--foreground) / 0.08);
+  --shadow-lg: 0 30px 64px -34px hsl(var(--primary) / 0.38), 0 10px 26px -14px hsl(var(--foreground) / 0.16);
 
   --font-display: var(--font-sora, "Sora"), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system,
