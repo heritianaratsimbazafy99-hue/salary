@@ -12,3 +12,4 @@ supabase/.temp
 .env.*.local
 *.pem
 *.key
+.vercel
