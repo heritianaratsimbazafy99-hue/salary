@@ -43,6 +43,45 @@ function createServerClientWithRole(role: string) {
   };
 }
 
+function createAdminClientForManagerCreation(insertedProfiles: Array<Record<string, unknown>>) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "profiles") {
+        return {
+          delete: vi.fn(() => ({
+            eq: vi.fn(async () => ({ error: null })),
+          })),
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            insertedProfiles.push(payload);
+
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: {
+                    email: payload.email,
+                    full_name: payload.full_name,
+                    id: "00000000-0000-0000-0000-000000000201",
+                    role: payload.role,
+                  },
+                  error: null,
+                })),
+              })),
+            };
+          }),
+        };
+      }
+
+      if (table === "agency_memberships") {
+        return {
+          insert: vi.fn(async () => ({ error: null })),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    }),
+  };
+}
+
 describe("HR admin permissions", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -88,5 +127,51 @@ describe("HR admin permissions", () => {
     ).rejects.toThrow("Action non autorisee.");
 
     expect(supabaseMocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("normalizes padded uppercase emails before creating an agency manager", async () => {
+    const insertedProfiles: Array<Record<string, unknown>> = [];
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
+    supabaseMocks.createAdminClient.mockReturnValue(
+      createAdminClientForManagerCreation(insertedProfiles),
+    );
+
+    const { createAgencyManager } = await import("../../lib/admin/users");
+
+    await expect(
+      createAgencyManager({
+        agencyId: "00000000-0000-0000-0000-000000000101",
+        email: " Manager@Example.COM ",
+        fullName: " Responsable Agence ",
+      }),
+    ).resolves.toMatchObject({
+      email: "manager@example.com",
+      full_name: "Responsable Agence",
+      role: "agency_manager",
+    });
+
+    expect(insertedProfiles).toEqual([
+      {
+        email: "manager@example.com",
+        full_name: "Responsable Agence",
+        role: "agency_manager",
+      },
+    ]);
+  });
+
+  it("forbids agency page access through the shared server guard", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("agency_manager"));
+
+    const { requireCanManageAgencies } = await import("../../lib/admin/auth");
+
+    await expect(requireCanManageAgencies()).rejects.toThrow("Action non autorisee.");
+  });
+
+  it("forbids agency manager assignment pages through the shared server guard", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("employee"));
+
+    const { requireCanAssignAgencyManager } = await import("../../lib/admin/auth");
+
+    await expect(requireCanAssignAgencyManager()).rejects.toThrow("Action non autorisee.");
   });
 });

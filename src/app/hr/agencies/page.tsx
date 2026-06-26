@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
+import { requireCanManageAgencies } from "@/lib/admin/auth";
 import { createAgency, listAgencies } from "@/lib/admin/agencies";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ async function createAgencyAction(formData: FormData) {
 }
 
 export default async function AgenciesPage() {
+  await requireCanManageAgencies();
+
   const agencies = await listAgencies();
 
   return (

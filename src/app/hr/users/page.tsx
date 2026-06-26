@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
+import { requireCanAssignAgencyManager } from "@/lib/admin/auth";
 import { listAgencies } from "@/lib/admin/agencies";
 import { createAgencyManager } from "@/lib/admin/users";
 
@@ -33,6 +34,8 @@ async function createAgencyManagerAction(formData: FormData) {
 }
 
 export default async function UsersPage() {
+  await requireCanAssignAgencyManager();
+
   const agencies = await listAgencies();
   const hasAgencies = agencies.length > 0;
 

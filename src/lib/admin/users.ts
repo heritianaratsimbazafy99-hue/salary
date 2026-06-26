@@ -2,15 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
-import {
-  AUTH_REQUIRED_ERROR_MESSAGE,
-  FORBIDDEN_ERROR_MESSAGE,
-  assertCanAssignAgencyManager,
-  isAppRole,
-} from "./permissions";
-import type { AppRole } from "../roles";
+import { requireCanAssignAgencyManager } from "./auth";
 import { createAdminClient } from "../supabase/admin";
-import { createClient } from "../supabase/server";
 
 export type AgencyManagerProfile = {
   id: string;
@@ -22,33 +15,12 @@ export type AgencyManagerProfile = {
 const CreateAgencyManagerInputSchema = z.object({
   agencyId: z.string().trim().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   email: z
-    .email()
+    .string()
     .trim()
+    .email()
     .transform((email) => email.toLowerCase()),
   fullName: z.string().trim().min(1).max(160),
 });
-
-async function getCurrentActorRole(): Promise<AppRole> {
-  const supabase = await createClient();
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-  const authUserId = claimsData?.claims.sub;
-
-  if (claimsError || !authUserId) {
-    throw new Error(AUTH_REQUIRED_ERROR_MESSAGE);
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("auth_user_id", authUserId)
-    .single();
-
-  if (profileError || !isAppRole(profile?.role)) {
-    throw new Error(FORBIDDEN_ERROR_MESSAGE);
-  }
-
-  return profile.role;
-}
 
 export async function createAgencyManager(input: {
   email: string;
@@ -61,7 +33,7 @@ export async function createAgencyManager(input: {
     throw new Error("Champs invalides.");
   }
 
-  assertCanAssignAgencyManager(await getCurrentActorRole());
+  await requireCanAssignAgencyManager();
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
