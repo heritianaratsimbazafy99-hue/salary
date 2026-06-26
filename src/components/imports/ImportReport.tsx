@@ -1,3 +1,5 @@
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
+
 type ImportError = {
   rowNumber: number;
   fieldName: string;
@@ -20,24 +22,26 @@ export function ImportReport({ validRowCount, invalidRowCount, unknownEmployeeCo
         <Metric label="Salaries inconnus" value={unknownEmployeeCount} />
       </div>
       {errors.length > 0 ? (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th className="py-2">Ligne</th>
-              <th>Champ</th>
-              <th>Erreur</th>
-            </tr>
-          </thead>
-          <tbody>
-            {errors.map((error) => (
-              <tr className="border-b border-border" key={`${error.rowNumber}:${error.fieldName}`}>
-                <td className="py-2">{error.rowNumber}</td>
-                <td>{error.fieldName}</td>
-                <td>{error.message}</td>
-              </tr>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ligne</TableHead>
+              <TableHead>Champ</TableHead>
+              <TableHead>Erreur</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {errors.map((error, index) => (
+              <TableRow key={`${error.rowNumber}:${error.fieldName}:${error.message}:${index}`}>
+                <TableCell>{error.rowNumber}</TableCell>
+                <TableCell>{error.fieldName}</TableCell>
+                <TableCell>
+                  <span className="block max-w-md whitespace-normal break-words">{error.message}</span>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : (
         <p className="text-sm text-muted-foreground">Aucune erreur detectee.</p>
       )}
