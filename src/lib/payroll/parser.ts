@@ -9,6 +9,24 @@ import {
 type RawRow = Record<string, unknown>;
 
 const STANDARD_COLUMNS = new Set<string>([...PAYROLL_REQUIRED_COLUMNS, ...PAYROLL_OPTIONAL_COLUMNS]);
+const NORMALIZED_FIELD_SOURCE_COLUMNS: Record<string, string> = {
+  employeeId: "employee_id",
+  email: "email",
+  periodStart: "period_start",
+  periodEnd: "period_end",
+  employeeName: "employee_name",
+  role: "role",
+  department: "department",
+  contractType: "contract_type",
+  baseSalary: "base_salary",
+  hoursWorked: "hours_worked",
+  overtimeHours: "overtime_hours",
+  grossAmount: "gross_amount",
+  deductionsTotal: "deductions_total",
+  netAmount: "net_amount",
+  paymentDate: "payment_date",
+  notes: "notes",
+};
 
 export type PayrollParseResult = {
   validRows: Extract<ParsedPayrollRow, { status: "valid" }>[];
@@ -58,11 +76,12 @@ export function parsePayrollRowsFromObjects(rows: RawRow[]): PayrollParseResult 
 
     const errors: PayrollRowError[] = parsed.error.issues.map((issue) => {
       const fieldName = String(issue.path[0] ?? "row");
+      const sourceColumn = NORMALIZED_FIELD_SOURCE_COLUMNS[fieldName] ?? fieldName;
       return {
         fieldName,
         errorCode: issue.code,
         message: issue.message,
-        rawValue: row[fieldName],
+        rawValue: row[sourceColumn],
       };
     });
 
@@ -83,7 +102,9 @@ function optionalString(value: unknown): string | undefined {
 
 function requiredNumber(value: unknown): number {
   if (typeof value === "number") return value;
-  const parsed = Number(String(value).replace(/\s/g, "").replace(",", "."));
+  const text = stringValue(value);
+  if (text.length === 0) return Number.NaN;
+  const parsed = Number(text.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
