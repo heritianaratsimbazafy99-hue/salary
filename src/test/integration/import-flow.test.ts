@@ -23,8 +23,9 @@ function createSupabaseClientWithUser(user: { id: string } | null) {
   };
 }
 
-function createImportRequest(formData: FormData) {
+function createImportRequest(formData: FormData, headers = new Headers()) {
   return {
+    headers,
     formData: vi.fn(async () => formData),
   } as unknown as NextRequest;
 }
@@ -88,6 +89,44 @@ describe("POST /api/imports", () => {
     formData.set("file", new File([new Uint8Array(10 * 1024 * 1024 + 1)], "payroll.xlsx"));
     formData.set("agencyId", "agency-001");
     formData.set("periodStart", "2026-06-01");
+    formData.set("periodEnd", "2026-06-30");
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+  });
+
+  it("returns 422 without parsing form data when content-length exceeds the upload limit and multipart overhead", async () => {
+    supabaseMocks.createClient.mockResolvedValue(
+      createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }),
+    );
+
+    const request = createImportRequest(
+      new FormData(),
+      new Headers({ "content-length": String(10 * 1024 * 1024 + 64 * 1024 + 1) }),
+    );
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when required period fields are blank after trimming", async () => {
+    supabaseMocks.createClient.mockResolvedValue(
+      createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }),
+    );
+
+    const formData = new FormData();
+    formData.set("file", new File(["employeeId\nEMP-001"], "payroll.xlsx"));
+    formData.set("agencyId", "agency-001");
+    formData.set("periodStart", "   ");
     formData.set("periodEnd", "2026-06-30");
 
     const response = await POST(createImportRequest(formData));
