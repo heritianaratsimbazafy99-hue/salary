@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getPublicSupabaseConfig } from "../env.public";
 import { requireSupabaseServiceRoleKey } from "../env.server";
 
-export function createAdminSupabaseClient() {
+export function createAdminClient() {
   const { supabaseUrl } = getPublicSupabaseConfig();
 
   return createClient(supabaseUrl, requireSupabaseServiceRoleKey(), {
@@ -16,3 +16,5 @@ export function createAdminSupabaseClient() {
     },
   });
 }
+
+export const createAdminSupabaseClient = createAdminClient;

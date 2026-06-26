@@ -9,23 +9,22 @@ type NavLink = {
 
 const LINKS_BY_ROLE: Record<AppRole, NavLink[]> = {
   agency_manager: [
-    { href: "/agence/imports", label: "Imports" },
-    { href: "/agence/employes", label: "Employes" },
-    { href: "/agence/fiches", label: "Fiches" },
+    { href: "/manager", label: "Tableau de bord" },
+    { href: "/manager/imports", label: "Imports" },
   ],
-  employee: [
-    { href: "/mes-fiches", label: "Mes fiches" },
-    { href: "/profil", label: "Profil" },
-  ],
+  employee: [{ href: "/employee/payslips", label: "Mes fiches" }],
   hr_central: [
-    { href: "/rh/agences", label: "Agences" },
-    { href: "/rh/fiches", label: "Fiches" },
-    { href: "/rh/audit", label: "Audit" },
+    { href: "/hr/agencies", label: "Agences" },
+    { href: "/hr/users", label: "Utilisateurs" },
+    { href: "/hr/audit", label: "Audit" },
+    { href: "/hr/analytics", label: "Analyses" },
   ],
   super_admin: [
     { href: "/admin", label: "Admin" },
-    { href: "/admin/utilisateurs", label: "Utilisateurs" },
-    { href: "/admin/audit", label: "Audit" },
+    { href: "/hr/agencies", label: "Agences" },
+    { href: "/hr/users", label: "Utilisateurs" },
+    { href: "/hr/audit", label: "Audit" },
+    { href: "/hr/analytics", label: "Analyses" },
   ],
 };
 
