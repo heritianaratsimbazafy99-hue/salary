@@ -5,6 +5,7 @@
 - Magic link auth is handled by Supabase Auth.
 - The Supabase service role key is server-only and must never be exposed through `NEXT_PUBLIC_`.
 - Protected server routes resolve the current actor from Supabase Auth claims and the `profiles` table before authorization decisions.
+- HR-created agency managers and linked employees are backed by Supabase Auth users and controlled `profiles.auth_user_id` records.
 
 ## Authorization
 
@@ -16,6 +17,8 @@
 - Super admin access is minimal and audited.
 - Import and export API routes return structured 401, 403, and 422 responses for auth and validation failures.
 - Publication writes use the service role only after the manager and agency guard has passed. User-scoped clients still load the import and enforce the authorization boundary before admin writes are created.
+- Publication is allowed only from `READY_FOR_PREVIEW`; non-publishable statuses return conflict before admin write clients are created.
+- Export requests create `export_jobs` and audit events only after the export authorization check passes.
 
 ## Sensitive Data
 
@@ -23,12 +26,13 @@
 - Email notifications do not include payroll amounts.
 - Audit metadata excludes tokens and payroll snapshots.
 - The notification test endpoint returns 404 in production before opening a Supabase client.
+- Excel uploads are size-limited, `.xlsx`-restricted, period-checked against the submitted import period, and rejected when they exceed the 2,000 useful-row MVP limit.
 
 ## Verification Evidence
 
 - `npm run typecheck`: passed.
 - `npm run lint`: passed with 0 warnings.
-- `npm run test`: 19 test files passed, 145 tests passed.
+- `npm run test`: 20 test files passed, 160 tests passed.
 - `npm run build`: passed.
 - `npm run test:e2e`: 8 Playwright tests passed.
 - `supabase db reset --local`: passed.
@@ -37,5 +41,5 @@
 
 ## Residual Risks
 
-- Payroll publication is a controlled sequence of Supabase writes, not a single database transaction or RPC. A later hardening pass should move publication into a transaction-backed RPC if partial-write rollback becomes required.
+- Payroll publication and export creation are controlled sequences of Supabase writes, not single database transactions or RPCs. A later hardening pass should move them into transaction-backed RPCs if partial-write rollback becomes required.
 - Moderate dependency advisories require breaking forced upgrades according to `npm audit`; they are tracked but not blocking this MVP gate because no high or critical advisory is present.
