@@ -1,11 +1,14 @@
-export type ImportEmployeeCandidate = {
+export type InvitationCandidate = {
   employeeId: string;
   email: string;
   employeeName: string;
+};
+
+export type ImportEmployeeCandidate = InvitationCandidate & {
   exists: boolean;
 };
 
-export function buildInvitationCandidates(rows: ImportEmployeeCandidate[]) {
+export function buildInvitationCandidates(rows: ImportEmployeeCandidate[]): InvitationCandidate[] {
   const seen = new Set<string>();
 
   return rows.flatMap((row) => {
