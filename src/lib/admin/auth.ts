@@ -7,10 +7,16 @@ import {
   FORBIDDEN_ERROR_MESSAGE,
   assertCanAssignAgencyManager,
   assertCanManageAgencies,
+  assertCanReadPayrollAnalytics,
   isAppRole,
 } from "./permissions";
 
-export async function getCurrentActorRole(): Promise<AppRole> {
+export type CurrentActor = {
+  id: string;
+  role: AppRole;
+};
+
+export async function getCurrentActor(): Promise<CurrentActor> {
   const supabase = await createClient();
   const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
   const authUserId = claimsData?.claims.sub;
@@ -21,15 +27,24 @@ export async function getCurrentActorRole(): Promise<AppRole> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role")
+    .select("id,role")
     .eq("auth_user_id", authUserId)
     .single();
 
-  if (profileError || !isAppRole(profile?.role)) {
+  if (profileError || typeof profile?.id !== "string" || !isAppRole(profile.role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
   }
 
-  return profile.role;
+  return {
+    id: profile.id,
+    role: profile.role,
+  };
+}
+
+export async function getCurrentActorRole(): Promise<AppRole> {
+  const actor = await getCurrentActor();
+
+  return actor.role;
 }
 
 export async function requireCanManageAgencies(): Promise<AppRole> {
@@ -38,6 +53,14 @@ export async function requireCanManageAgencies(): Promise<AppRole> {
   assertCanManageAgencies(role);
 
   return role;
+}
+
+export async function requireCanReadPayrollAnalytics(): Promise<CurrentActor> {
+  const actor = await getCurrentActor();
+
+  assertCanReadPayrollAnalytics(actor.role);
+
+  return actor;
 }
 
 export async function requireCanAssignAgencyManager(): Promise<AppRole> {

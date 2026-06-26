@@ -15,6 +15,10 @@ export function canAssignAgencyManager(role: AppRole): boolean {
   return role === "hr_central" || role === "super_admin";
 }
 
+export function canReadPayrollAnalytics(role: AppRole): boolean {
+  return role === "hr_central" || role === "super_admin";
+}
+
 export function assertCanManageAgencies(role: AppRole): void {
   if (!canManageAgencies(role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
@@ -23,6 +27,12 @@ export function assertCanManageAgencies(role: AppRole): void {
 
 export function assertCanAssignAgencyManager(role: AppRole): void {
   if (!canAssignAgencyManager(role)) {
+    throw new Error(FORBIDDEN_ERROR_MESSAGE);
+  }
+}
+
+export function assertCanReadPayrollAnalytics(role: AppRole): void {
+  if (!canReadPayrollAnalytics(role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
   }
 }

@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertCanAssignAgencyManager,
   assertCanManageAgencies,
+  assertCanReadPayrollAnalytics,
   canAssignAgencyManager,
   canManageAgencies,
+  canReadPayrollAnalytics,
 } from "../../lib/admin/permissions";
 
 const supabaseMocks = vi.hoisted(() => ({
@@ -34,12 +36,27 @@ function createServerClientWithRole(role: string) {
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           single: vi.fn(async () => ({
-            data: { role },
+            data: {
+              id: "00000000-0000-0000-0000-000000000101",
+              role,
+            },
             error: null,
           })),
         })),
       })),
     })),
+  };
+}
+
+function createServerClientWithoutClaims() {
+  return {
+    auth: {
+      getClaims: vi.fn(async () => ({
+        data: { claims: {} },
+        error: null,
+      })),
+    },
+    from: vi.fn(),
   };
 }
 
@@ -103,6 +120,13 @@ describe("HR admin permissions", () => {
     expect(canAssignAgencyManager("employee")).toBe(false);
   });
 
+  it("allows only HR central and super admins to read payroll analytics", () => {
+    expect(canReadPayrollAnalytics("hr_central")).toBe(true);
+    expect(canReadPayrollAnalytics("super_admin")).toBe(true);
+    expect(canReadPayrollAnalytics("agency_manager")).toBe(false);
+    expect(canReadPayrollAnalytics("employee")).toBe(false);
+  });
+
   it("throws a stable error when agency management is forbidden", () => {
     expect(() => assertCanManageAgencies("agency_manager")).toThrow("Action non autorisee.");
     expect(() => assertCanManageAgencies("employee")).toThrow("Action non autorisee.");
@@ -111,6 +135,11 @@ describe("HR admin permissions", () => {
   it("throws a stable error when agency manager assignment is forbidden", () => {
     expect(() => assertCanAssignAgencyManager("agency_manager")).toThrow("Action non autorisee.");
     expect(() => assertCanAssignAgencyManager("employee")).toThrow("Action non autorisee.");
+  });
+
+  it("throws a stable error when payroll analytics access is forbidden", () => {
+    expect(() => assertCanReadPayrollAnalytics("agency_manager")).toThrow("Action non autorisee.");
+    expect(() => assertCanReadPayrollAnalytics("employee")).toThrow("Action non autorisee.");
   });
 
   it("does not use service-role writes when creating an agency manager is forbidden", async () => {
@@ -173,5 +202,40 @@ describe("HR admin permissions", () => {
     const { requireCanAssignAgencyManager } = await import("../../lib/admin/auth");
 
     await expect(requireCanAssignAgencyManager()).rejects.toThrow("Action non autorisee.");
+  });
+
+  it("forbids payroll analytics pages for agency managers through the shared server guard", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("agency_manager"));
+
+    const { requireCanReadPayrollAnalytics } = await import("../../lib/admin/auth");
+
+    await expect(requireCanReadPayrollAnalytics()).rejects.toThrow("Action non autorisee.");
+  });
+
+  it("forbids payroll analytics pages for employees through the shared server guard", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("employee"));
+
+    const { requireCanReadPayrollAnalytics } = await import("../../lib/admin/auth");
+
+    await expect(requireCanReadPayrollAnalytics()).rejects.toThrow("Action non autorisee.");
+  });
+
+  it("requires authentication before payroll analytics authorization", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithoutClaims());
+
+    const { requireCanReadPayrollAnalytics } = await import("../../lib/admin/auth");
+
+    await expect(requireCanReadPayrollAnalytics()).rejects.toThrow("Authentification requise.");
+  });
+
+  it("returns the current actor for authorized payroll analytics access", async () => {
+    supabaseMocks.createServerClient.mockResolvedValue(createServerClientWithRole("hr_central"));
+
+    const { requireCanReadPayrollAnalytics } = await import("../../lib/admin/auth");
+
+    await expect(requireCanReadPayrollAnalytics()).resolves.toEqual({
+      id: "00000000-0000-0000-0000-000000000101",
+      role: "hr_central",
+    });
   });
 });
