@@ -6,6 +6,7 @@ import { UploadStepper } from "@/components/imports/UploadStepper";
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   Table,
   TableBody,
@@ -101,7 +102,9 @@ export default async function ManagerImportsPage() {
                     <TableCell>
                       {payrollImport.periodStart} - {payrollImport.periodEnd}
                     </TableCell>
-                    <TableCell>{payrollImport.status}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={payrollImport.status} />
+                    </TableCell>
                     <TableCell>{payrollImport.validRowCount}</TableCell>
                     <TableCell>
                       {payrollImport.invalidRowCount + payrollImport.unknownEmployeeCount}

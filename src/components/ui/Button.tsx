@@ -10,9 +10,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-primary text-primary-foreground shadow-[var(--shadow-sm)] hover:bg-primary-strong hover:shadow-[var(--shadow-md)] active:translate-y-px",
+    "bg-primary text-primary-foreground shadow-[var(--shadow-sm)] hover:bg-primary-strong hover:shadow-[var(--shadow-md)] hover:-translate-y-px active:translate-y-0",
   accent:
-    "bg-accent text-accent-foreground shadow-[var(--shadow-sm)] hover:brightness-95 hover:shadow-[var(--shadow-md)] active:translate-y-px",
+    "bg-accent text-accent-foreground shadow-[var(--shadow-sm)] hover:brightness-95 hover:shadow-[var(--shadow-md)] hover:-translate-y-px active:translate-y-0",
   secondary:
     "border border-border bg-surface text-foreground shadow-[var(--shadow-xs)] hover:bg-muted hover:border-primary/30 active:translate-y-px",
   ghost: "text-foreground hover:bg-muted active:translate-y-px",
@@ -33,7 +33,7 @@ export function Button({
   return (
     <button
       className={[
-        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold",
         "transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",
         sizeClasses[size],

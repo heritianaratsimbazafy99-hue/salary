@@ -16,7 +16,7 @@ export function Input({ className, hint, id, label, name, ...props }: InputProps
       </label>
       <input
         className={[
-          "h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-[var(--shadow-xs)]",
+          "h-11 rounded-xl border border-border bg-surface px-3.5 text-sm text-foreground shadow-[var(--shadow-xs)]",
           "outline-none transition placeholder:text-muted-foreground",
           "focus:border-primary focus:ring-2 focus:ring-primary/25",
           "disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground",

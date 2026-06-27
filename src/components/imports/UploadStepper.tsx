@@ -1,3 +1,5 @@
+import { Check } from "lucide-react";
+
 const STEPS = ["Upload", "Mapping", "Validation", "Invitations", "Previsualisation", "Publication"];
 
 export function UploadStepper({ currentStep }: { currentStep: number }) {
@@ -13,9 +15,9 @@ export function UploadStepper({ currentStep }: { currentStep: number }) {
             className={[
               "flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors",
               isCurrent
-                ? "border-primary/30 bg-primary/10 font-semibold text-primary"
+                ? "border-primary/40 bg-primary/10 font-semibold text-primary shadow-[var(--shadow-xs)]"
                 : isDone
-                  ? "border-border bg-surface text-foreground"
+                  ? "border-success/30 bg-success/[0.06] text-foreground"
                   : "border-border bg-surface text-muted-foreground",
             ].join(" ")}
             key={step}
@@ -26,11 +28,11 @@ export function UploadStepper({ currentStep }: { currentStep: number }) {
                 isCurrent
                   ? "bg-primary text-primary-foreground"
                   : isDone
-                    ? "bg-success/15 text-success"
+                    ? "bg-success text-primary-foreground"
                     : "bg-muted text-muted-foreground",
               ].join(" ")}
             >
-              {index + 1}
+              {isDone ? <Check className="size-3.5" aria-hidden="true" /> : index + 1}
             </span>
             <span className="min-w-0 truncate">{step}</span>
           </li>

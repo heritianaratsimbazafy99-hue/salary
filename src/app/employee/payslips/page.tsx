@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, History } from "lucide-react";
 
 import { PayslipView } from "@/components/payslips/PayslipView";
 import { AccessDenied } from "@/components/shell/AccessDenied";
@@ -57,7 +57,7 @@ export default async function EmployeePayslipsPage() {
 function DownloadPayslipsLink() {
   return (
     <a
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-foreground shadow-[var(--shadow-xs)] transition-all duration-200 hover:border-primary/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-foreground shadow-[var(--shadow-xs)] transition-all duration-200 hover:-translate-y-px hover:border-primary/30 hover:bg-muted hover:shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       href="/api/employee/payslips/export"
     >
       <Download className="size-4" aria-hidden="true" />
@@ -68,11 +68,19 @@ function DownloadPayslipsLink() {
 
 function PayslipHistory({ payslips }: { payslips: EmployeePayslip[] }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
-      <h2 className="font-display text-lg font-semibold">Historique publié</h2>
+    <section className="rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <History className="size-4" aria-hidden="true" />
+        </span>
+        <h2 className="font-display text-lg font-semibold">Historique publié</h2>
+      </div>
       <ul className="mt-4 divide-y divide-border">
         {payslips.map((payslip) => (
-          <li className="flex flex-wrap items-center justify-between gap-3 py-3" key={payslip.id}>
+          <li
+            className="group flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-primary/[0.04]"
+            key={payslip.id}
+          >
             <span>
               <span className="block text-sm font-medium">{payslip.periodLabel}</span>
               <span className="block text-xs text-muted-foreground">
@@ -91,9 +99,9 @@ function PayslipHistory({ payslips }: { payslips: EmployeePayslip[] }) {
 
 function EmptyPayslipState() {
   return (
-    <section className="rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
-      <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-        <FileText className="size-6" aria-hidden="true" />
+    <section className="rounded-3xl border border-dashed border-border bg-surface px-6 py-14 text-center">
+      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <FileText className="size-7" aria-hidden="true" />
       </span>
       <h2 className="mt-5 font-display text-lg font-semibold">Aucune fiche publiée</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
