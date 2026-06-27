@@ -12,7 +12,7 @@ const validEnv = {
   NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "0.1",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_example",
   NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-  SENTRY_AUTH_TOKEN: "sntrys_placeholder_token_for_tests_only",
+  SENTRY_AUTH_TOKEN: "sntrys_placeholder+/token=for_tests_only",
   SENTRY_ORG: "stark-3t",
   SENTRY_PROJECT: "salary",
   SUPABASE_SERVICE_ROLE_KEY: "placeholder-service-role",

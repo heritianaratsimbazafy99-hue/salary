@@ -56,7 +56,7 @@ export function validateProductionEnv(env) {
     errors.push("SUPABASE_SERVICE_ROLE_KEY must not equal the public Supabase key.");
   }
 
-  if (hasValue(env.SENTRY_AUTH_TOKEN) && !/^sntrys_[A-Za-z0-9_-]{20,}$/.test(env.SENTRY_AUTH_TOKEN)) {
+  if (hasValue(env.SENTRY_AUTH_TOKEN) && !/^sntrys_[A-Za-z0-9_+/=-]{20,}$/.test(env.SENTRY_AUTH_TOKEN)) {
     errors.push("SENTRY_AUTH_TOKEN must be a Sentry organization auth token and must stay server/build-only.");
   }
 
