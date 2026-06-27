@@ -34,8 +34,12 @@ export function AuditLogTable({ logs }: { logs: AuditLog[] }) {
               <time dateTime={log.createdAt}>{log.createdAt}</time>
             </TableCell>
             <TableCell>{log.actorRole ?? "Systeme"}</TableCell>
-            <TableCell>{log.action}</TableCell>
-            <TableCell>{log.resourceType}</TableCell>
+            <TableCell>
+              <span className="inline-flex items-center rounded-md bg-primary/[0.06] px-2 py-0.5 font-mono text-xs font-medium text-primary">
+                {log.action}
+              </span>
+            </TableCell>
+            <TableCell className="text-muted-foreground">{log.resourceType}</TableCell>
           </TableRow>
         ))}
       </TableBody>

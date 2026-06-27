@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
-@source inline("{bg-background,bg-muted,bg-primary,bg-surface,bg-surface-elevated,bg-accent,bg-success,bg-warning,bg-danger,text-foreground,text-muted-foreground,text-primary,text-primary-foreground,text-accent-foreground,text-success,text-warning,text-danger,border-border}");
+@source inline("{bg-background,bg-muted,bg-primary,bg-surface,bg-surface-elevated,bg-accent,bg-success,bg-warning,bg-danger,bg-teal,bg-amber,text-foreground,text-muted-foreground,text-primary,text-primary-foreground,text-accent-foreground,text-success,text-warning,text-danger,text-teal,text-amber,border-border}");
 
 :root {
   /* ----------------------------------------------------------------------
-     Brand palette — aligned to the Madajob logo:
+     Brand palette — anchored to the Madajob logo:
      · primary  = the steel/navy blue (trust, the dominant action colour)
      · accent   = the lime green (energy, "opportunity", positive money cues)
-     A cool, near-white neutral base keeps the two brand colours crisp and
-     reads as professional fintech rather than warm/editorial.
+     The landing layers two more vivid brand roles on top — a fresh teal that
+     bridges navy→lime, and a warm amber for the human, optimistic notes — so
+     the marketing surface reads colourful and alive without losing identity.
+     The app shell keeps the same crisp, near-white neutral base.
   ---------------------------------------------------------------------- */
   --background: 210 38% 98%;
   --foreground: 213 41% 14%;
@@ -26,6 +28,12 @@
   --warning: 38 92% 50%;
   --danger: 0 72% 53%;
 
+  /* Vivid brand roles — used to colour the marketing surface */
+  --teal: 188 78% 39%;
+  --teal-foreground: 188 80% 96%;
+  --amber: 32 95% 53%;
+  --amber-foreground: 28 80% 14%;
+
   /* Deep brand surface used for hero / reassurance panels — logo navy */
   --ink: 212 54% 11%;
   --ink-foreground: 205 38% 96%;
@@ -42,6 +50,7 @@
   --shadow-sm: 0 1px 3px hsl(var(--foreground) / 0.08), 0 1px 2px hsl(var(--foreground) / 0.04);
   --shadow-md: 0 10px 28px -14px hsl(var(--primary) / 0.22), 0 2px 6px -2px hsl(var(--foreground) / 0.08);
   --shadow-lg: 0 30px 64px -34px hsl(var(--primary) / 0.38), 0 10px 26px -14px hsl(var(--foreground) / 0.16);
+  --shadow-glow: 0 0 0 1px hsl(var(--primary) / 0.06), 0 24px 60px -28px hsl(var(--teal) / 0.5);
 
   --font-display: var(--font-sora, "Sora"), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system,
@@ -64,6 +73,10 @@
   --color-success: hsl(var(--success));
   --color-warning: hsl(var(--warning));
   --color-danger: hsl(var(--danger));
+  --color-teal: hsl(var(--teal));
+  --color-teal-foreground: hsl(var(--teal-foreground));
+  --color-amber: hsl(var(--amber));
+  --color-amber-foreground: hsl(var(--amber-foreground));
   --color-ink: hsl(var(--ink));
   --color-ink-foreground: hsl(var(--ink-foreground));
   --color-ink-muted: hsl(var(--ink-muted));
@@ -98,6 +111,42 @@ body {
 }
 
 /* ----------------------------------------------------------------------------
+   Reusable surface flourishes
+---------------------------------------------------------------------------- */
+
+/* Soft drifting colour mesh used behind hero / CTA panels. */
+.brand-mesh {
+  background-image:
+    radial-gradient(42rem 30rem at 12% -8%, hsl(var(--teal) / 0.16), transparent 60%),
+    radial-gradient(38rem 30rem at 92% 4%, hsl(var(--accent) / 0.18), transparent 58%),
+    radial-gradient(50rem 40rem at 50% 120%, hsl(var(--primary) / 0.12), transparent 60%);
+}
+
+.brand-mesh-dark {
+  background-image:
+    radial-gradient(40rem 30rem at 8% 0%, hsl(var(--teal) / 0.32), transparent 60%),
+    radial-gradient(34rem 28rem at 96% 12%, hsl(var(--accent) / 0.26), transparent 58%),
+    radial-gradient(46rem 36rem at 60% 120%, hsl(var(--primary) / 0.45), transparent 62%);
+}
+
+/* Hairline gradient used for animated connectors / dividers. */
+.flow-line {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--teal) / 0.55),
+    hsl(var(--accent) / 0.65),
+    hsl(var(--primary) / 0.45)
+  );
+}
+
+/* Thin gradient ring on a tinted chip. */
+.ring-brand {
+  box-shadow:
+    inset 0 0 0 1px hsl(var(--primary) / 0.1),
+    0 1px 2px hsl(var(--primary) / 0.06);
+}
+
+/* ----------------------------------------------------------------------------
    Motion system
    Reveal-on-scroll: hidden only when JS is active, so no-JS users always see
    content. Reduced-motion forces everything visible with no transition.
@@ -126,6 +175,16 @@ body {
   }
 }
 
+@keyframes salary-float-soft {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -7px, 0);
+  }
+}
+
 @keyframes salary-rise {
   from {
     opacity: 0;
@@ -139,7 +198,7 @@ body {
 
 @keyframes salary-pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 hsl(var(--success) / 0.35);
+    box-shadow: 0 0 0 0 hsl(var(--success) / 0.4);
   }
   70% {
     box-shadow: 0 0 0 10px hsl(var(--success) / 0);
@@ -161,22 +220,28 @@ body {
   animation: salary-pulse-ring 2.4s ease-out infinite;
 }
 
-/* Animated connector line for the "parcours" flow */
-.flow-line {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--primary) / 0.45),
-    hsl(var(--accent) / 0.55)
-  );
-}
-
 /* ----------------------------------------------------------------------------
-   Hero showcase — self-playing demo of the employee journey
+   Hero — "votre paie prend vie"
+   A live payslip card that counts up, draws its breakdown, and gently parallaxes
+   under the pointer, wrapped in a drifting colour aurora.
 ---------------------------------------------------------------------------- */
-@keyframes salary-scene-in {
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(6%, -4%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-5%, 5%, 0) scale(0.96);
+  }
+}
+
+@keyframes hero-card-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(26px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -184,18 +249,7 @@ body {
   }
 }
 
-@keyframes salary-line-in {
-  from {
-    opacity: 0;
-    transform: translateY(9px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes salary-progress {
+@keyframes hero-bar-grow {
   from {
     transform: scaleX(0);
   }
@@ -204,35 +258,10 @@ body {
   }
 }
 
-@keyframes salary-scan {
-  0% {
-    transform: translateY(-120%);
-    opacity: 0;
-  }
-  18%,
-  82% {
-    opacity: 0.55;
-  }
-  100% {
-    transform: translateY(120%);
-    opacity: 0;
-  }
-}
-
-@keyframes salary-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
-  }
-  50% {
-    box-shadow: 0 0 0 9px hsl(var(--primary) / 0.14);
-  }
-}
-
-@keyframes salary-count {
+@keyframes hero-chip-in {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: translateY(14px) scale(0.9);
   }
   to {
     opacity: 1;
@@ -240,35 +269,111 @@ body {
   }
 }
 
-@keyframes salary-ring {
+@keyframes hero-shimmer {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes hero-ring-draw {
   to {
     stroke-dashoffset: 0;
   }
 }
 
-.hero-scene {
-  animation: salary-scene-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+@keyframes badge-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-.hero-line {
-  animation: salary-line-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(46px);
+  will-change: transform;
+  animation: aurora-drift var(--aurora-dur, 18s) ease-in-out infinite;
 }
-.hero-progress {
+
+.hero-stage {
+  /* pointer-driven parallax targets, set from JS; default centred */
+  --px: 0;
+  --py: 0;
+}
+
+.hero-card {
+  transform: perspective(1200px) rotateX(calc(var(--py) * -3deg)) rotateY(calc(var(--px) * 4deg));
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: hero-card-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-parallax {
+  transform: translate3d(calc(var(--px) * var(--depth, 10px)), calc(var(--py) * var(--depth, 10px)), 0);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-bar {
   transform-origin: left;
-  animation: salary-progress 3.6s linear both;
+  animation: hero-bar-grow 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.hero-scan {
-  animation: salary-scan 3.6s ease-in-out infinite;
+
+.hero-chip {
+  animation:
+    hero-chip-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both,
+    salary-float-soft 7s ease-in-out infinite;
 }
-.hero-glow {
-  animation: salary-glow 2.2s ease-in-out infinite;
+
+.hero-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    hsl(var(--accent) / 0.55) 50%,
+    transparent 80%
+  );
+  transform: translateX(-130%);
+  animation: hero-shimmer 2.6s ease-in-out 1s infinite;
 }
-.hero-count {
-  animation: salary-count 0.6s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
+
 .hero-ring {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: salary-ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+  animation: hero-ring-draw 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.badge-twinkle {
+  animation: badge-twinkle 2.6s ease-in-out infinite;
+}
+
+/* ----------------------------------------------------------------------------
+   Marquee — quiet trust strip
+---------------------------------------------------------------------------- */
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 28s linear infinite;
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -285,18 +390,27 @@ body {
   .animate-float,
   .animate-rise,
   .pulse-dot,
-  .hero-scene,
-  .hero-line,
-  .hero-progress,
-  .hero-scan,
-  .hero-glow,
-  .hero-count,
-  .hero-ring {
+  .aurora-blob,
+  .hero-card,
+  .hero-bar,
+  .hero-chip,
+  .hero-ring,
+  .badge-twinkle,
+  .marquee-track {
     animation: none !important;
   }
 
-  .hero-progress {
+  .hero-card,
+  .hero-parallax {
+    transform: none !important;
+  }
+
+  .hero-bar {
     transform: scaleX(1);
+  }
+
+  .hero-shimmer::after {
+    display: none;
   }
 
   .hero-ring {

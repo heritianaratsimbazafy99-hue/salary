@@ -6,6 +6,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   Table,
   TableBody,
@@ -116,7 +117,9 @@ export default async function AgenciesPage() {
                   <TableRow key={agency.id}>
                     <TableCell className="font-medium text-foreground">{agency.name}</TableCell>
                     <TableCell>{agency.code}</TableCell>
-                    <TableCell>{agency.is_active ? "Active" : "Inactive"}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={agency.is_active ? "ACTIVE" : "INACTIVE"} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
