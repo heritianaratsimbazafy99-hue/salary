@@ -28,6 +28,7 @@
 - Original Excel files are not retained after analysis.
 - Email notifications do not include payroll amounts.
 - Audit metadata excludes tokens and payroll snapshots.
+- Sentry monitoring strips request query strings, request bodies, cookies, sensitive headers, email, username, and IP address before sending events.
 - The notification test endpoint returns 404 in production before opening a Supabase client.
 - Excel uploads are size-limited, `.xlsx`-restricted, period-checked against the submitted import period, and rejected when they exceed the 2,000 useful-row MVP limit.
 

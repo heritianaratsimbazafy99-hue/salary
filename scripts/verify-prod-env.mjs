@@ -10,7 +10,13 @@ const REQUIRED_PUBLIC_KEY_NAMES = [
 const requiredVars = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_APP_URL",
+  "NEXT_PUBLIC_SENTRY_DSN",
+  "NEXT_PUBLIC_SENTRY_ENVIRONMENT",
+  "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "SENTRY_ORG",
+  "SENTRY_PROJECT",
+  "SENTRY_AUTH_TOKEN",
 ];
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -42,16 +48,31 @@ export function validateProductionEnv(env) {
 
   validateHttpsUrl(env.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL", errors);
   validateHttpsUrl(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
+  validateHttpsUrl(env.NEXT_PUBLIC_SENTRY_DSN, "NEXT_PUBLIC_SENTRY_DSN", errors);
+  validateSentrySampleRate(env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE, errors);
 
   const publicKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (hasValue(publicKey) && hasValue(env.SUPABASE_SERVICE_ROLE_KEY) && publicKey === env.SUPABASE_SERVICE_ROLE_KEY) {
     errors.push("SUPABASE_SERVICE_ROLE_KEY must not equal the public Supabase key.");
   }
 
+  if (hasValue(env.SENTRY_AUTH_TOKEN) && !/^sntrys_[A-Za-z0-9_+/=-]{20,}$/.test(env.SENTRY_AUTH_TOKEN)) {
+    errors.push("SENTRY_AUTH_TOKEN must be a Sentry organization auth token and must stay server/build-only.");
+  }
+
   return {
     errors,
     ok: errors.length === 0,
   };
+}
+
+function validateSentrySampleRate(value, errors) {
+  if (!hasValue(value)) return;
+
+  const sampleRate = Number(value);
+  if (!Number.isFinite(sampleRate) || sampleRate < 0 || sampleRate > 1) {
+    errors.push("NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE must be a number between 0 and 1.");
+  }
 }
 
 function hasValue(value) {
