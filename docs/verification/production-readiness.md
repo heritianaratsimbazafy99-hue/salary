@@ -1,6 +1,6 @@
 # Production Readiness Gate
 
-Scope: lock production readiness outside monitoring and Resend. Those two areas remain explicitly excluded until separate setup is requested.
+Scope: lock production readiness outside Resend. Monitoring is handled by Sentry and is part of the production gate.
 
 ## Automated Gates
 
@@ -38,7 +38,13 @@ Production must define these variables in the deployment platform:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SENTRY_DSN`
+- `NEXT_PUBLIC_SENTRY_ENVIRONMENT`
+- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SENTRY_ORG`
+- `SENTRY_PROJECT`
+- `SENTRY_AUTH_TOKEN`
 
 Validation command:
 
@@ -51,7 +57,25 @@ Rules:
 - production URLs must use HTTPS;
 - production URLs must not point to localhost or loopback hosts;
 - `SUPABASE_SERVICE_ROLE_KEY` must never equal the public Supabase key;
+- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` must be between `0` and `1`;
+- `SENTRY_AUTH_TOKEN` must stay server/build-only and never use a `NEXT_PUBLIC_` name;
 - `RESEND_API_KEY` is intentionally excluded for now.
+
+## Monitoring
+
+- Sentry organization: `stark-3t`.
+- Sentry project: `salary`.
+- Platform: Next.js.
+- Default alert: high-priority issues with email notification.
+- Source maps upload when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are present during the production build.
+- SDK privacy stance: `sendDefaultPii` is disabled, request body/query/cookies and sensitive headers are stripped before events are sent.
+
+Smoke check after deployment:
+
+1. Confirm the deployment environment contains the Sentry variables above.
+2. Trigger a controlled test exception from a non-sensitive test path or staging preview.
+3. Confirm the event appears in Sentry under project `salary`.
+4. Resolve or delete the test issue after the smoke check.
 
 ## Database
 
@@ -70,7 +94,6 @@ Rules:
 
 ## Current Exclusions
 
-- Monitoring and alerting setup.
 - Resend production delivery.
 
-These exclusions mean the app can be treated as a production candidate only after CI, env, branch protection, and backup/restore are complete. Final go-live still requires separate monitoring and Resend work.
+This exclusion means the app can be treated as a production candidate only after CI, env, Sentry, branch protection, and backup/restore are complete. Final go-live still requires separate Resend work.

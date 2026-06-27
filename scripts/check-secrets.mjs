@@ -19,6 +19,10 @@ const highConfidencePatterns = [
     pattern: /\bre_[A-Za-z0-9]{20,}\b/g,
   },
   {
+    name: "Sentry auth token",
+    pattern: /\bsntrys_[A-Za-z0-9_+/=-]{20,}/g,
+  },
+  {
     name: "JWT-like Supabase secret",
     pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
   },

@@ -22,6 +22,15 @@ describe("project scaffold", () => {
     expect(existsSync("docs/verification/production-readiness.md")).toBe(true);
   });
 
+  it("defines the Sentry monitoring integration", () => {
+    expect(packageJson.dependencies["@sentry/nextjs"]).toBeDefined();
+    expect(existsSync("src/instrumentation-client.ts")).toBe(true);
+    expect(existsSync("src/instrumentation.ts")).toBe(true);
+    expect(existsSync("src/sentry.server.config.ts")).toBe(true);
+    expect(existsSync("src/sentry.edge.config.ts")).toBe(true);
+    expect(existsSync("src/app/global-error.tsx")).toBe(true);
+  });
+
   it("runs the required CI gates in GitHub Actions", () => {
     const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
 
