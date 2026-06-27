@@ -7,25 +7,39 @@ import { Button } from "@/components/ui/Button";
 export function PublishImportButton({ importId }: { importId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   async function publishImport() {
     setIsPublishing(true);
     setMessage(null);
+    setHasError(false);
 
-    const response = await fetch(`/api/imports/${importId}/publish`, {
-      method: "POST",
-    });
+    let shouldReactivate = true;
 
-    if (response.ok) {
-      window.location.reload();
-      return;
+    try {
+      const response = await fetch(`/api/imports/${importId}/publish`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        shouldReactivate = false;
+        window.location.reload();
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: unknown } }
+        | null;
+      setHasError(true);
+      setMessage(typeof payload?.error?.message === "string" ? payload.error.message : "Publication impossible.");
+    } catch {
+      setHasError(true);
+      setMessage("Erreur reseau. Verifiez votre connexion puis reessayez.");
+    } finally {
+      if (shouldReactivate) {
+        setIsPublishing(false);
+      }
     }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: { message?: unknown } }
-      | null;
-    setMessage(typeof payload?.error?.message === "string" ? payload.error.message : "Publication impossible.");
-    setIsPublishing(false);
   }
 
   return (
@@ -33,7 +47,11 @@ export function PublishImportButton({ importId }: { importId: string }) {
       <Button disabled={isPublishing} onClick={publishImport} type="button">
         {isPublishing ? "Publication" : "Publier"}
       </Button>
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {message ? (
+        <p className={`text-sm ${hasError ? "text-danger" : "text-muted-foreground"}`} role={hasError ? "alert" : "status"}>
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -2,9 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AgencyScopedActor } from "@/lib/admin/auth";
 import { assertCanManagePayrollForAgency } from "@/lib/admin/permissions";
+import {
+  ensureEmployeeAuthProfile,
+  rollbackEmployeeAuthProfileProvisioning,
+  type ProvisionedEmployeeAuthProfile,
+} from "@/lib/employees/linking";
 
 type SupabaseReadClient = Pick<SupabaseClient, "from">;
-type SupabasePublishClient = Pick<SupabaseClient, "rpc">;
+type SupabasePublishClient = Pick<SupabaseClient, "auth" | "from" | "rpc">;
 
 type PayrollImportRecord = {
   agency_id?: unknown;
@@ -12,6 +17,12 @@ type PayrollImportRecord = {
   period_end?: unknown;
   period_start?: unknown;
   status?: unknown;
+};
+
+type PayrollImportEmployeeRecord = {
+  employee_email?: unknown;
+  employee_id?: unknown;
+  employee_name?: unknown;
 };
 
 type PublishRpcRecord = {
@@ -62,7 +73,32 @@ export async function publishPayrollImport(input: {
     throw new PublishConflictError(payrollImport.status);
   }
 
+  const employeeIdentities = await loadPayrollImportEmployeeIdentities(input.readSupabase, {
+    agencyId: payrollImport.agencyId,
+    importId: input.importId,
+  });
   const writeSupabase = input.createWriteSupabase();
+  const provisionedEmployees: ProvisionedEmployeeAuthProfile[] = [];
+
+  try {
+    for (const employee of employeeIdentities) {
+      provisionedEmployees.push(
+        await ensureEmployeeAuthProfile(
+          {
+            agencyId: payrollImport.agencyId,
+            email: employee.email,
+            employeeId: employee.employeeId,
+            fullName: employee.fullName,
+          },
+          writeSupabase,
+        ),
+      );
+    }
+  } catch (error) {
+    await rollbackProvisionedEmployees(writeSupabase, provisionedEmployees);
+    throw error;
+  }
+
   const { data, error } = await writeSupabase.rpc("publish_payroll_import", {
     p_actor_agency_id: payrollImport.agencyId,
     p_actor_profile_id: input.actor.id,
@@ -70,6 +106,7 @@ export async function publishPayrollImport(input: {
   });
 
   if (error) {
+    await rollbackProvisionedEmployees(writeSupabase, provisionedEmployees);
     throw new Error("Impossible de publier l'import.");
   }
 
@@ -83,6 +120,17 @@ export async function publishPayrollImport(input: {
     publishedCount: result.publishedCount,
     status: "PUBLISHED",
   };
+}
+
+async function rollbackProvisionedEmployees(
+  admin: SupabasePublishClient,
+  provisionedEmployees: ProvisionedEmployeeAuthProfile[],
+) {
+  await Promise.allSettled(
+    provisionedEmployees.map((employee) =>
+      rollbackEmployeeAuthProfileProvisioning(admin, employee),
+    ),
+  );
 }
 
 async function loadPayrollImport(supabase: SupabaseReadClient, importId: string) {
@@ -112,6 +160,39 @@ async function loadPayrollImport(supabase: SupabaseReadClient, importId: string)
     periodStart: payrollImport.period_start,
     status: payrollImport.status,
   };
+}
+
+async function loadPayrollImportEmployeeIdentities(
+  supabase: SupabaseReadClient,
+  input: { agencyId: string; importId: string },
+) {
+  const { data, error } = await supabase
+    .from("payroll_import_rows")
+    .select("employee_id,employee_email,employee_name")
+    .eq("import_id", input.importId)
+    .eq("agency_id", input.agencyId);
+
+  if (error) {
+    throw new Error("Impossible de charger les salaries de l'import.");
+  }
+
+  return ((data ?? []) as PayrollImportEmployeeRecord[]).flatMap((row) => {
+    if (
+      typeof row.employee_id !== "string" ||
+      typeof row.employee_email !== "string" ||
+      typeof row.employee_name !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        email: row.employee_email,
+        employeeId: row.employee_id,
+        fullName: row.employee_name,
+      },
+    ];
+  });
 }
 
 function parsePublishRpcRecord(data: unknown): PublishImportResult {

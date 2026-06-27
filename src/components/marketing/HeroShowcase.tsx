@@ -18,7 +18,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 /**
  * Self-playing showcase of the employee journey on MadajobPay. Four scenes auto-
  * advance on a loop, each demonstrating one feature an employee actually uses:
- * passwordless login, a readable payslip, the full history, and PDF download.
+ * passwordless login, a readable payslip, the full history, and CSV download.
  *
  * Accessibility:
  * - Respects prefers-reduced-motion: pins the payslip scene, no auto-advance,
@@ -40,7 +40,7 @@ const SCENES: Scene[] = [
   { id: "login", label: "Connexion", hint: "par lien magique", icon: Fingerprint },
   { id: "payslip", label: "Votre fiche", hint: "en clair", icon: FileText },
   { id: "history", label: "Historique", hint: "complet", icon: History },
-  { id: "pdf", label: "Télécharger", hint: "en PDF", icon: Download },
+  { id: "export", label: "Télécharger", hint: "en CSV", icon: Download },
 ];
 
 const PAYSLIP_LINES: Array<[string, string, "pos" | "neg"]> = [
@@ -136,7 +136,7 @@ export function HeroShowcase() {
             {scene === 0 ? <SceneLogin /> : null}
             {scene === 1 ? <ScenePayslip /> : null}
             {scene === 2 ? <SceneHistory /> : null}
-            {scene === 3 ? <ScenePdf /> : null}
+            {scene === 3 ? <SceneDownload /> : null}
           </div>
         </div>
       </div>
@@ -263,7 +263,7 @@ function ScenePayslip() {
         </div>
         <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground shadow-[var(--shadow-xs)]">
           <Download className="size-3.5 text-primary" aria-hidden="true" />
-          PDF
+          CSV
         </span>
       </div>
     </div>
@@ -305,7 +305,7 @@ function SceneHistory() {
   );
 }
 
-function ScenePdf() {
+function SceneDownload() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
       <span className="relative flex size-20 items-center justify-center">
@@ -329,7 +329,7 @@ function ScenePdf() {
       </span>
       <div>
         <p className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-foreground">
-          fiche-paie-juin-2026.pdf
+          fiches-paie-2026.csv
         </p>
         <p className="mt-1 inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-success">
           <Check className="size-3.5" aria-hidden="true" />

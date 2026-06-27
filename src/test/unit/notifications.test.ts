@@ -12,7 +12,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: supabaseMocks.createClient,
 }));
 
-function createSupabaseClientWithUser(user: { id: string } | null) {
+function createSupabaseClientWithUser(user: { id: string } | null, role: string | null = "hr_central") {
   return {
     auth: {
       getUser: vi.fn(async () => ({
@@ -20,6 +20,16 @@ function createSupabaseClientWithUser(user: { id: string } | null) {
         error: null,
       })),
     },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(async () => ({
+            data: role ? { role } : null,
+            error: role ? null : { code: "PGRST116" },
+          })),
+        })),
+      })),
+    })),
   };
 }
 
@@ -96,7 +106,20 @@ describe("GET /api/notifications/test", () => {
     });
   });
 
-  it("returns a sample notification email for authenticated requests", async () => {
+  it("returns 403 and FORBIDDEN for authenticated non-HR requests", async () => {
+    supabaseMocks.createClient.mockResolvedValue(
+      createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }, "employee"),
+    );
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "FORBIDDEN" },
+    });
+  });
+
+  it("returns a sample notification email for authenticated HR requests", async () => {
     supabaseMocks.createClient.mockResolvedValue(
       createSupabaseClientWithUser({ id: "00000000-0000-0000-0000-000000000001" }),
     );

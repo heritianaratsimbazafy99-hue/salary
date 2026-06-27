@@ -69,8 +69,14 @@ export async function resolveImportColumnMappings(input: {
     importId: input.importId,
   });
   const unknownColumns = uniqueSortedColumns(rows.flatMap((row) => Object.keys(row.rawUnknownColumns)));
-  const submittedMappings = normalizeMappings(input.mappings, unknownColumns);
   const existingMappings = await loadColumnMappings(input.readSupabase, payrollImport.agencyId);
+  const columnsNeedingSubmission = unknownColumns.filter(
+    (column) => !existingMappings.some((mapping) => mapping.sourceColumn === column),
+  );
+  const submittedMappings = normalizeMappings(input.mappings, {
+    acceptedColumns: unknownColumns,
+    requiredColumns: columnsNeedingSubmission,
+  });
   const combinedMappings = combineMappings(existingMappings, submittedMappings);
   const writeSupabase = input.createWriteSupabase();
 
@@ -184,10 +190,10 @@ async function loadColumnMappings(
 
 function normalizeMappings(
   mappings: ResolveColumnMappingInput[],
-  requiredColumns: string[],
+  input: { acceptedColumns: string[]; requiredColumns: string[] },
 ): ColumnMapping[] {
   const mappingBySourceColumn = new Map<string, ColumnMapping>();
-  const requiredColumnSet = new Set(requiredColumns);
+  const acceptedColumnSet = new Set(input.acceptedColumns);
 
   mappings.forEach((mapping) => {
     const sourceColumn = mapping.sourceColumn.trim();
@@ -196,7 +202,7 @@ function normalizeMappings(
     if (
       sourceColumn.length === 0 ||
       displayLabel.length === 0 ||
-      !requiredColumnSet.has(sourceColumn) ||
+      !acceptedColumnSet.has(sourceColumn) ||
       !isPayItemCategory(mapping.targetCategory)
     ) {
       throw new ResolveMappingValidationError("Mapping de colonne invalide.");
@@ -209,7 +215,7 @@ function normalizeMappings(
     });
   });
 
-  const missingColumns = requiredColumns.filter((column) => !mappingBySourceColumn.has(column));
+  const missingColumns = input.requiredColumns.filter((column) => !mappingBySourceColumn.has(column));
   if (missingColumns.length > 0) {
     throw new ResolveMappingValidationError("Toutes les colonnes inconnues doivent etre mappees.");
   }

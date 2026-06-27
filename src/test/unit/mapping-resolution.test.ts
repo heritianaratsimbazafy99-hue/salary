@@ -197,6 +197,72 @@ describe("resolveImportColumnMappings", () => {
     expect(db.payroll_imports[0]).toMatchObject({ status: "READY_FOR_PREVIEW" });
   });
 
+  it("accepts only newly unmapped columns when existing mappings already cover other unknown columns", async () => {
+    const db = createMappingDb();
+    db.column_mappings.push({
+      agency_id: AGENCY_ID,
+      created_by: ACTOR_PROFILE_ID,
+      display_label: "Cantine",
+      source_column: "cafeteria",
+      target_category: "BENEFIT",
+    });
+    db.payroll_imports.push({
+      agency_id: AGENCY_ID,
+      id: IMPORT_ID,
+      status: "NEEDS_MAPPING",
+    });
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID,
+      id: "00000000-0000-0000-0000-000000000502",
+      import_id: IMPORT_ID,
+      pay_items: [],
+      raw_unknown_columns: {
+        bonus: "50 000",
+        cafeteria: "2 500",
+      },
+    });
+
+    const client = createMappingClient(db) as unknown as MappingClient;
+
+    const result = await resolveImportColumnMappings({
+      actor: {
+        agencyId: AGENCY_ID,
+        id: ACTOR_PROFILE_ID,
+        role: "agency_manager",
+      },
+      importId: IMPORT_ID,
+      mappings: [
+        {
+          displayLabel: "Prime exceptionnelle",
+          sourceColumn: "bonus",
+          targetCategory: "BONUS",
+        },
+      ],
+      createWriteSupabase: () => client,
+      readSupabase: client,
+    });
+
+    expect(result).toEqual({
+      importId: IMPORT_ID,
+      mappedColumnCount: 1,
+      status: "READY_FOR_PREVIEW",
+    });
+    expect(db.payroll_import_rows[0]).toMatchObject({
+      pay_items: expect.arrayContaining([
+        expect.objectContaining({
+          amount: 50000,
+          category: "BONUS",
+          label: "Prime exceptionnelle",
+        }),
+        expect.objectContaining({
+          amount: 2500,
+          category: "BENEFIT",
+          label: "Cantine",
+        }),
+      ]),
+    });
+  });
+
   it("rejects a mapping update for an import outside the manager agency", async () => {
     const db = createMappingDb();
     db.payroll_imports.push({

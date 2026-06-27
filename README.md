@@ -15,4 +15,6 @@ Internal payroll information platform for agency payroll imports and employee we
 
 Run `npm run verify` before opening a pull request.
 
-After starting the dev server, run `npm run test:e2e`.
+After starting Supabase/Docker, run `npm run test:e2e` for authenticated browser coverage.
+
+For the full launch gate, run `npm run verify:full` and follow `docs/verification/launch-runbook.md`.

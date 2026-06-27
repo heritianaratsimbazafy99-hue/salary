@@ -3,7 +3,10 @@ import packageJson from "../../../package.json";
 
 describe("project scaffold", () => {
   it("exposes the required verification script", () => {
-    expect(packageJson.scripts.verify).toBe("npm run typecheck && npm run test && npm run build");
+    expect(packageJson.scripts.verify).toBe("npm run lint && npm run typecheck && npm run test && npm run build");
+    expect(packageJson.scripts["verify:full"]).toBe(
+      "npm run verify && npm run test:e2e && npm audit --audit-level=high",
+    );
   });
 
   it("uses the approved Excel parser dependency", () => {

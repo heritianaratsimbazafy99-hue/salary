@@ -13,6 +13,7 @@ type Props = {
 export function ColumnMappingForm({ importId, unknownColumns }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   if (unknownColumns.length === 0) {
     return <p className="text-sm text-muted-foreground">Toutes les colonnes sont reconnues.</p>;
@@ -22,6 +23,7 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage(null);
+    setHasError(false);
 
     const formData = new FormData(event.currentTarget);
     const mappings = unknownColumns.map((column, index) => ({
@@ -30,19 +32,34 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
       targetCategory: String(formData.get(`mappings.${index}.targetCategory`) ?? "OTHER_ELEMENTS"),
     }));
 
-    const response = await fetch(`/api/imports/${importId}/mappings`, {
-      body: JSON.stringify({ mappings }),
-      headers: { "content-type": "application/json" },
-      method: "POST",
-    });
+    let shouldReactivate = true;
 
-    if (!response.ok) {
-      setMessage("Mapping impossible.");
-      setIsSubmitting(false);
-      return;
+    try {
+      const response = await fetch(`/api/imports/${importId}/mappings`, {
+        body: JSON.stringify({ mappings }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: { message?: unknown } }
+        | null;
+
+      if (!response.ok) {
+        setHasError(true);
+        setMessage(typeof payload?.error?.message === "string" ? payload.error.message : "Mapping impossible.");
+        return;
+      }
+
+      shouldReactivate = false;
+      window.location.assign(`/manager/imports/${importId}`);
+    } catch {
+      setHasError(true);
+      setMessage("Erreur reseau. Verifiez votre connexion puis reessayez.");
+    } finally {
+      if (shouldReactivate) {
+        setIsSubmitting(false);
+      }
     }
-
-    window.location.assign(`/manager/imports/${importId}`);
   }
 
   return (
@@ -87,7 +104,11 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
         <Button disabled={isSubmitting} type="submit">
           {isSubmitting ? "Enregistrement" : "Enregistrer les mappings"}
         </Button>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        {message ? (
+          <p className={`text-sm ${hasError ? "text-danger" : "text-muted-foreground"}`} role={hasError ? "alert" : "status"}>
+            {message}
+          </p>
+        ) : null}
       </div>
     </form>
   );

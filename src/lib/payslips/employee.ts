@@ -16,8 +16,10 @@ type EmployeeProfileRow = {
 type EmployeePayslipDbRow = {
   current_version?: unknown;
   employee?: unknown;
+  id?: unknown;
   period_end?: unknown;
   period_start?: unknown;
+  published_at?: unknown;
 };
 
 type EmployeeRelation = {
@@ -48,18 +50,23 @@ export type EmployeePayslip = {
   deductionsTotal: number;
   employeeName: string;
   grossAmount: number;
+  id: string;
   netAmount: number;
   payItems: Array<
     | { id: string; label: string; category: string; amount: number }
     | { id: string; label: string; category: string; text: string }
   >;
+  periodEnd: string;
   periodLabel: string;
+  periodStart: string;
+  publishedAt: string;
 };
 
 const EMPLOYEE_PAYSLIP_COLUMNS = `
   id,
   period_start,
   period_end,
+  published_at,
   employee:employees!inner(id,employee_id,full_name,profile_id),
   current_version:payslip_versions!payslips_current_version_fk(id,snapshot_data,pay_items)
 `;
@@ -67,6 +74,13 @@ const EMPLOYEE_PAYSLIP_COLUMNS = `
 export async function loadCurrentEmployeePayslip(
   supabase: SupabaseEmployeeClient,
 ): Promise<EmployeePayslip | null> {
+  const payslips = await loadEmployeePayslips(supabase);
+  return payslips[0] ?? null;
+}
+
+export async function loadEmployeePayslips(
+  supabase: SupabaseEmployeeClient,
+): Promise<EmployeePayslip[]> {
   const profile = await loadCurrentEmployeeProfile(supabase);
 
   const { data, error } = await supabase
@@ -75,15 +89,14 @@ export async function loadCurrentEmployeePayslip(
     .not("current_version_id", "is", null)
     .eq("employee.profile_id", profile.id)
     .order("period_start", { ascending: false })
-    .limit(1);
+    .order("published_at", { ascending: false });
 
   if (error) {
     throw new Error("Impossible de charger les fiches de paie.");
   }
 
-  const row = Array.isArray(data) ? (data[0] as EmployeePayslipDbRow | undefined) : undefined;
-
-  return row ? mapEmployeePayslip(row, profile.id) : null;
+  const rows = Array.isArray(data) ? (data as EmployeePayslipDbRow[]) : [];
+  return rows.map((row) => mapEmployeePayslip(row, profile.id));
 }
 
 async function loadCurrentEmployeeProfile(supabase: SupabaseEmployeeClient) {
@@ -128,9 +141,13 @@ function mapEmployeePayslip(row: EmployeePayslipDbRow, profileId: string): Emplo
     deductionsTotal: requiredNumber(snapshot.deductionsTotal),
     employeeName: requiredString(employee.full_name),
     grossAmount: requiredNumber(snapshot.grossAmount),
+    id: requiredString(row.id),
     netAmount: requiredNumber(snapshot.netAmount),
     payItems: mapPayItems(currentVersion.pay_items),
+    periodEnd: requiredString(row.period_end),
     periodLabel: `${requiredString(row.period_start)} - ${requiredString(row.period_end)}`,
+    periodStart: requiredString(row.period_start),
+    publishedAt: requiredString(row.published_at),
   };
 }
 

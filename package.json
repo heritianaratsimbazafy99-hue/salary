@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "verify:full": "npm run verify && npm run test:e2e && npm audit --audit-level=high"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",

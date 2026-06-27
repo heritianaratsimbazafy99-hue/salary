@@ -103,6 +103,9 @@ function createSupabaseClient(options: {
 
 function createTableQuery(db: PublishTestDb, table: keyof PublishTestDb) {
   return {
+    delete() {
+      return createDeleteQuery(db[table]);
+    },
     insert(payload: PublishTableRow | PublishTableRow[]) {
       const payloadRows = Array.isArray(payload) ? payload : [payload];
       const insertedRows = payloadRows.map((row, index) => ({
@@ -139,6 +142,28 @@ function createTableQuery(db: PublishTestDb, table: keyof PublishTestDb) {
       return createMutationResult([insertedRow]);
     },
   };
+}
+
+function createDeleteQuery(rows: PublishTableRow[]) {
+  const filters: Array<(row: PublishTableRow) => boolean> = [];
+
+  const query = {
+    eq(column: string, value: unknown) {
+      filters.push((row) => row[column] === value);
+      return query;
+    },
+    then(resolve: (value: { data: null; error: null }) => unknown, reject?: (reason: unknown) => unknown) {
+      for (let index = rows.length - 1; index >= 0; index -= 1) {
+        if (filters.every((filter) => filter(rows[index]))) {
+          rows.splice(index, 1);
+        }
+      }
+
+      return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+    },
+  };
+
+  return query;
 }
 
 function createMutationResult(rows: PublishTableRow[]) {
@@ -234,6 +259,39 @@ function createAuthorizedPublishClient(options: {
 
 function createPublishRequest() {
   return {} as NextRequest;
+}
+
+function createAdminPublishClient(db: PublishTestDb) {
+  return {
+    auth: {
+      admin: {
+        createUser: vi.fn(async (payload: Record<string, unknown>) => ({
+          data: {
+            user: {
+              email: payload.email,
+              id: "00000000-0000-0000-0000-000000000701",
+            },
+          },
+          error: null,
+        })),
+        deleteUser: vi.fn(async () => ({ data: { user: null }, error: null })),
+      },
+    },
+    from: vi.fn((table: keyof PublishTestDb) => createTableQuery(db, table)),
+    rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({
+      data: [
+        {
+          agency_id: AGENCY_ID,
+          import_id: IMPORT_ID,
+          period_end: "2026-06-30",
+          period_start: "2026-06-01",
+          published_count: 1,
+          status: "PUBLISHED",
+        },
+      ],
+      error: null,
+    })),
+  };
 }
 
 function createPublishContext(importId: string) {
@@ -376,21 +434,7 @@ describe("POST /api/imports/:importId/publish", () => {
       normalized_data: { employeeId: "EMP-001", netAmount: 1100000 },
       pay_items: [],
     });
-    const adminClient = {
-      rpc: vi.fn(async () => ({
-        data: [
-          {
-            agency_id: AGENCY_ID,
-            import_id: IMPORT_ID,
-            period_end: "2026-06-30",
-            period_start: "2026-06-01",
-            published_count: 1,
-            status: "PUBLISHED",
-          },
-        ],
-        error: null,
-      })),
-    };
+    const adminClient = createAdminPublishClient(db);
     adminMocks.createAdminClient.mockReturnValue(adminClient);
 
     const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
@@ -408,6 +452,32 @@ describe("POST /api/imports/:importId/publish", () => {
       p_actor_profile_id: ACTOR_PROFILE_ID,
       p_import_id: IMPORT_ID,
     });
+    expect(adminClient.auth.admin.createUser).toHaveBeenCalledWith({
+      email: "employee@example.com",
+      email_confirm: true,
+      user_metadata: {
+        employee_id: "EMP-001",
+        full_name: "Employee One",
+        role: "employee",
+      },
+    });
+    expect(db.profiles).toContainEqual(
+      expect.objectContaining({
+        auth_user_id: "00000000-0000-0000-0000-000000000701",
+        email: "employee@example.com",
+        full_name: "Employee One",
+        role: "employee",
+      }),
+    );
+    expect(db.employees).toContainEqual(
+      expect.objectContaining({
+        agency_id: AGENCY_ID,
+        email: "employee@example.com",
+        employee_id: "EMP-001",
+        full_name: "Employee One",
+        is_active: true,
+      }),
+    );
     expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "PAYROLL_IMPORT_PUBLISHED",
@@ -422,12 +492,20 @@ describe("POST /api/imports/:importId/publish", () => {
   it("returns 500 and does not audit when the transactional publish RPC fails", async () => {
     const { db } = createAuthorizedPublishClient();
     seedPublishImport(db);
-    const adminClient = {
-      rpc: vi.fn(async () => ({
-        data: null,
-        error: { message: "transaction failed" },
-      })),
-    };
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID,
+      employee_email: "employee@example.com",
+      employee_id: "EMP-001",
+      employee_name: "Employee One",
+      import_id: IMPORT_ID,
+      normalized_data: { employeeId: "EMP-001", netAmount: 1100000 },
+      pay_items: [],
+    });
+    const adminClient = createAdminPublishClient(db);
+    adminClient.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "transaction failed" },
+    });
     adminMocks.createAdminClient.mockReturnValue(adminClient);
 
     const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
@@ -437,6 +515,9 @@ describe("POST /api/imports/:importId/publish", () => {
       error: { code: "INTERNAL_ERROR" },
     });
     expect(adminClient.rpc).toHaveBeenCalledOnce();
+    expect(db.profiles).not.toContainEqual(expect.objectContaining({ email: "employee@example.com" }));
+    expect(db.employees).toHaveLength(0);
+    expect(adminClient.auth.admin.deleteUser).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000701");
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 });

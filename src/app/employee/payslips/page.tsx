@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { FileText } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 
 import { PayslipView } from "@/components/payslips/PayslipView";
 import { AccessDenied } from "@/components/shell/AccessDenied";
@@ -9,17 +9,17 @@ import {
   AUTH_REQUIRED_ERROR_MESSAGE,
   FORBIDDEN_ERROR_MESSAGE,
 } from "@/lib/admin/permissions";
-import { loadCurrentEmployeePayslip } from "@/lib/payslips/employee";
+import { loadEmployeePayslips, type EmployeePayslip } from "@/lib/payslips/employee";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeePayslipsPage() {
   const supabase = await createClient();
-  let payslip: Awaited<ReturnType<typeof loadCurrentEmployeePayslip>>;
+  let payslips: Awaited<ReturnType<typeof loadEmployeePayslips>>;
 
   try {
-    payslip = await loadCurrentEmployeePayslip(supabase);
+    payslips = await loadEmployeePayslips(supabase);
   } catch (error) {
     if (hasErrorMessage(error, AUTH_REQUIRED_ERROR_MESSAGE)) {
       redirect("/auth/login");
@@ -39,10 +39,53 @@ export default async function EmployeePayslipsPage() {
           eyebrow="Espace salarié"
           title="Mes fiches de paie"
           description="Consultez et téléchargez vos fiches internes publiées."
+          actions={payslips.length > 0 ? <DownloadPayslipsLink /> : null}
         />
-        {payslip ? <PayslipView {...payslip} /> : <EmptyPayslipState />}
+        {payslips[0] ? (
+          <>
+            <PayslipView {...payslips[0]} />
+            <PayslipHistory payslips={payslips} />
+          </>
+        ) : (
+          <EmptyPayslipState />
+        )}
       </div>
     </AppShell>
+  );
+}
+
+function DownloadPayslipsLink() {
+  return (
+    <a
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-foreground shadow-[var(--shadow-xs)] transition-all duration-200 hover:border-primary/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      href="/api/employee/payslips/export"
+    >
+      <Download className="size-4" aria-hidden="true" />
+      Télécharger CSV
+    </a>
+  );
+}
+
+function PayslipHistory({ payslips }: { payslips: EmployeePayslip[] }) {
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
+      <h2 className="font-display text-lg font-semibold">Historique publié</h2>
+      <ul className="mt-4 divide-y divide-border">
+        {payslips.map((payslip) => (
+          <li className="flex flex-wrap items-center justify-between gap-3 py-3" key={payslip.id}>
+            <span>
+              <span className="block text-sm font-medium">{payslip.periodLabel}</span>
+              <span className="block text-xs text-muted-foreground">
+                Publiée le {formatDate(payslip.publishedAt)}
+              </span>
+            </span>
+            <span className="font-display text-sm font-semibold tabular-nums">
+              {formatMga(payslip.netAmount)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -67,4 +110,18 @@ function ForbiddenEmployeeAccess() {
 
 function hasErrorMessage(error: unknown, message: string): error is Error {
   return error instanceof Error && error.message === message;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("fr-MG", {
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
+function formatMga(value: number) {
+  return new Intl.NumberFormat("fr-MG", {
+    style: "currency",
+    currency: "MGA",
+    maximumFractionDigits: 0,
+  }).format(value);
 }

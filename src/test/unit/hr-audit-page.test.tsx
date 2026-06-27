@@ -9,6 +9,7 @@ const auditPageMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   redirect: auditPageMocks.redirect,
+  usePathname: () => "/hr/audit",
 }));
 
 vi.mock("@/lib/admin/auth", () => ({

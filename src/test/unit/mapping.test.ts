@@ -34,6 +34,22 @@ describe("applyColumnMappings", () => {
     ]);
   });
 
+  it("maps localized numeric strings to amounts", () => {
+    const result = applyColumnMappings(
+      { prime_transport: "50 000,5" },
+      [{ sourceColumn: "prime_transport", targetCategory: "BENEFIT", displayLabel: "Prime transport" }],
+    );
+
+    expect(result).toEqual([
+      {
+        label: "Prime transport",
+        category: "BENEFIT",
+        amount: 50000.5,
+        rawValue: "50 000,5",
+      },
+    ]);
+  });
+
   it("ignores unmapped columns", () => {
     const result = applyColumnMappings(
       { prime_transport: 50000, cafeteria: 2500 },
