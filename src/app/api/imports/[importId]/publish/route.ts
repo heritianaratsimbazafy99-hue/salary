@@ -48,7 +48,10 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
       agencyId: result.agencyId,
       metadata: {
         agencyId: result.agencyId,
+        emailFailedCount: result.emailFailedCount,
+        emailSentCount: result.emailSentCount,
         importId: result.importId,
+        notificationCount: result.notificationCount,
         periodEnd: result.periodEnd,
         periodStart: result.periodStart,
         rowCount: result.publishedCount,

@@ -24,6 +24,6 @@ Verified on 2026-06-26 from branch `codex/payroll-platform`.
 
 ## Remaining Verification Notes
 
-- Resend live delivery is intentionally outside the MVP completion gate. The committed boundary verifies notification templates do not expose payroll amounts and disables the local test endpoint in production.
+- Resend live delivery is now part of the production release gate. The committed boundary verifies notification templates do not expose payroll amounts, disables the local test endpoint in production, and requires Resend configuration in production env validation.
 - Local Supabase secret keys from `supabase status` are not committed and must not be copied into public client environment variables.
 - Manager import, column mapping resolution, transactional publication, export, employee auth linking, and protected manager pages are verified by unit/integration tests; browser E2E currently verifies anonymous access guards rather than a seeded authenticated payroll journey.

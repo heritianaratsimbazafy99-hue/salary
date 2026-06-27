@@ -17,6 +17,8 @@ const requiredVars = [
   "SENTRY_ORG",
   "SENTRY_PROJECT",
   "SENTRY_AUTH_TOKEN",
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
 ];
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -30,7 +32,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(1);
   }
 
-  console.log("Production environment validation passed. Resend is intentionally excluded.");
+  console.log("Production environment validation passed.");
 }
 
 export function validateProductionEnv(env) {
@@ -59,6 +61,9 @@ export function validateProductionEnv(env) {
   if (hasValue(env.SENTRY_AUTH_TOKEN) && !/^sntrys_[A-Za-z0-9_+/=-]{20,}$/.test(env.SENTRY_AUTH_TOKEN)) {
     errors.push("SENTRY_AUTH_TOKEN must be a Sentry organization auth token and must stay server/build-only.");
   }
+
+  validateResendApiKey(env.RESEND_API_KEY, errors);
+  validateResendFromEmail(env.RESEND_FROM_EMAIL, errors);
 
   return {
     errors,
@@ -97,4 +102,41 @@ function validateHttpsUrl(value, name, errors) {
   if (["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"].includes(url.hostname)) {
     errors.push(`${name} must not point to a local host in production.`);
   }
+}
+
+function validateResendApiKey(value, errors) {
+  if (!hasValue(value)) return;
+
+  if (!/^re_[A-Za-z0-9_-]{20,}$/.test(value.trim())) {
+    errors.push("RESEND_API_KEY must be a Resend API key that starts with re_ and must stay server-only.");
+  }
+}
+
+function validateResendFromEmail(value, errors) {
+  if (!hasValue(value)) return;
+
+  const address = extractEmailAddress(value);
+
+  if (!isEmailAddress(address)) {
+    errors.push("RESEND_FROM_EMAIL must be a valid sender email or Name <email> value.");
+    return;
+  }
+
+  const normalizedAddress = address.toLowerCase();
+  const domain = normalizedAddress.split("@").at(-1);
+
+  if (domain === "example.com" || normalizedAddress === "onboarding@resend.dev") {
+    errors.push("RESEND_FROM_EMAIL must use a verified production sender, not example.com or onboarding@resend.dev.");
+  }
+}
+
+function extractEmailAddress(value) {
+  const trimmed = value.trim();
+  const angleAddress = trimmed.match(/<([^<>]+)>$/);
+
+  return (angleAddress?.[1] ?? trimmed).trim();
+}
+
+function isEmailAddress(value) {
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
 }

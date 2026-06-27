@@ -1,6 +1,6 @@
 # Production Readiness Gate
 
-Scope: lock production readiness outside Resend. Monitoring is handled by Sentry and is part of the production gate.
+Scope: lock the production release gate for the payroll platform. Sentry monitoring and Resend email delivery are part of the gate.
 
 ## Automated Gates
 
@@ -19,8 +19,7 @@ The repository enforces these through `.github/workflows/ci.yml`.
 Protect `main` with:
 
 - Require pull request before merging.
-- Require at least 1 approving review.
-- Dismiss stale approvals when new commits are pushed.
+- Approval reviews disabled for the solo-owner workflow.
 - Require status checks to pass before merging.
 - Require branch to be up to date before merging.
 - Required checks:
@@ -45,6 +44,8 @@ Production must define these variables in the deployment platform:
 - `SENTRY_ORG`
 - `SENTRY_PROJECT`
 - `SENTRY_AUTH_TOKEN`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
 
 Validation command:
 
@@ -59,7 +60,8 @@ Rules:
 - `SUPABASE_SERVICE_ROLE_KEY` must never equal the public Supabase key;
 - `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` must be between `0` and `1`;
 - `SENTRY_AUTH_TOKEN` must stay server/build-only and never use a `NEXT_PUBLIC_` name;
-- `RESEND_API_KEY` is intentionally excluded for now.
+- `RESEND_API_KEY` must be a server-only Resend key beginning with `re_`;
+- `RESEND_FROM_EMAIL` must use a verified production sender, not `example.com` or `onboarding@resend.dev`.
 
 ## Monitoring
 
@@ -84,6 +86,19 @@ Smoke check after deployment:
 - Restore drill must be completed using `docs/operations/supabase-backup-restore.md`.
 - Production writes should be paused before any destructive restore.
 
+## Email Delivery
+
+- Resend application delivery must be configured in Vercel Production and Preview with `RESEND_API_KEY` and `RESEND_FROM_EMAIL`.
+- The sender domain must be verified in Resend before go-live.
+- Supabase Auth must use custom SMTP for magic links and auth emails:
+  - host: `smtp.resend.com`;
+  - port: `465`;
+  - username: `resend`;
+  - password: `RESEND_API_KEY`;
+  - sender name: `MadajobPay`;
+  - sender email: the same verified sender domain used by `RESEND_FROM_EMAIL`.
+- `/api/health` must return HTTP `200`, `status: "ok"`, and `checks.email: "configured"` after deployment.
+
 ## Security
 
 - `npm audit --audit-level=high` must pass.
@@ -94,6 +109,4 @@ Smoke check after deployment:
 
 ## Current Exclusions
 
-- Resend production delivery.
-
-This exclusion means the app can be treated as a production candidate only after CI, env, Sentry, branch protection, and backup/restore are complete. Final go-live still requires separate Resend work.
+There are no intentional functional launch exclusions. If Resend sender-domain verification or Supabase Auth SMTP configuration is missing, launch is blocked until that external configuration is complete.

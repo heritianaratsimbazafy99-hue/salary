@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 type HealthBody = {
   checks: {
     app: "ok";
-    email: "resend_excluded";
+    email: "configured" | "missing";
     supabase: "ok" | "error";
   };
   status: "ok" | "degraded";
@@ -16,6 +16,7 @@ type HealthBody = {
 
 export async function GET() {
   const timestamp = new Date().toISOString();
+  const email = resolveEmailCheck();
 
   try {
     const supabase = createAdminClient();
@@ -29,20 +30,20 @@ export async function GET() {
       {
         checks: {
           app: "ok",
-          email: "resend_excluded",
+          email,
           supabase: "ok",
         },
-        status: "ok",
+        status: email === "configured" ? "ok" : "degraded",
         timestamp,
       },
-      200,
+      email === "configured" ? 200 : 503,
     );
   } catch {
     return healthResponse(
       {
         checks: {
           app: "ok",
-          email: "resend_excluded",
+          email,
           supabase: "error",
         },
         status: "degraded",
@@ -60,4 +61,12 @@ function healthResponse(body: HealthBody, status: number) {
     },
     status,
   });
+}
+
+export function resolveEmailCheck(env: NodeJS.ProcessEnv = process.env): HealthBody["checks"]["email"] {
+  return hasValue(env.RESEND_API_KEY) && hasValue(env.RESEND_FROM_EMAIL) ? "configured" : "missing";
+}
+
+function hasValue(value: string | undefined) {
+  return typeof value === "string" && value.trim().length > 0;
 }
