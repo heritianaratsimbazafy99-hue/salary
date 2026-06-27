@@ -14,6 +14,7 @@ import {
 import { z } from "zod";
 
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { MagicLinkHashHandler } from "@/components/auth/MagicLinkHashHandler";
 import { Reveal } from "@/components/marketing/Reveal";
 
 import { buildMagicLinkOtpOptions } from "@/lib/auth/magic-link";
@@ -132,6 +133,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="min-h-dvh bg-background px-4 py-6 text-foreground sm:px-6 md:py-10">
+      <MagicLinkHashHandler />
       <section className="mx-auto grid min-h-[calc(100dvh-4.5rem)] max-w-6xl items-stretch gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-8">
         {/* Brand / reassurance panel */}
         <aside className="relative hidden overflow-hidden rounded-3xl border border-ink/30 bg-ink p-8 text-ink-foreground shadow-[var(--shadow-lg)] lg:flex lg:flex-col">

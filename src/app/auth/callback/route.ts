@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isAppRole } from "@/lib/admin/permissions";
+import type { AppRole } from "@/lib/roles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+const ROLE_REDIRECTS: Record<AppRole, string> = {
+  agency_manager: "/manager/imports",
+  employee: "/employee/payslips",
+  hr_central: "/hr/analytics",
+  super_admin: "/hr/analytics",
+};
 
 function noStoreRedirect(response: NextResponse): NextResponse {
   response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate, max-age=0");
@@ -35,5 +44,21 @@ export async function GET(request: NextRequest) {
     return loginRedirect(request, "callback_failed");
   }
 
-  return noStoreRedirect(NextResponse.redirect(new URL("/", request.url)));
+  const { data: userData } = await supabase.auth.getUser();
+  const authUserId = userData.user?.id;
+  let redirectPath = "/";
+
+  if (authUserId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("auth_user_id", authUserId)
+      .single();
+
+    if (isAppRole(profile?.role)) {
+      redirectPath = ROLE_REDIRECTS[profile.role];
+    }
+  }
+
+  return noStoreRedirect(NextResponse.redirect(new URL(redirectPath, request.url)));
 }

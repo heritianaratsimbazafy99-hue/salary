@@ -11,7 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "verify:prod-env": "node scripts/verify-prod-env.mjs",
+    "db:reset:local": "supabase db reset --local",
+    "db:advisors": "supabase db advisors --local --type all --level warn --fail-on error",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "verify:ci": "npm run check:secrets && npm run verify && npm audit --audit-level=high",
+    "verify:full": "npm run check:secrets && npm run verify && npm run test:e2e && npm run db:advisors && npm audit --audit-level=high"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",

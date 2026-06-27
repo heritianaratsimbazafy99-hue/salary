@@ -41,6 +41,8 @@ type ExportTableRow = Record<string, unknown>;
 type ExportTestDb = {
   agency_memberships: ExportTableRow[];
   export_jobs: ExportTableRow[];
+  payroll_analytics_rows: ExportTableRow[];
+  payroll_imports: ExportTableRow[];
   profiles: ExportTableRow[];
 };
 
@@ -48,6 +50,8 @@ function createExportDb(): ExportTestDb {
   return {
     agency_memberships: [],
     export_jobs: [],
+    payroll_analytics_rows: [],
+    payroll_imports: [],
     profiles: [],
   };
 }
@@ -97,6 +101,17 @@ function createTableQuery(rows: ExportTableRow[]) {
     select() {
       return query;
     },
+    order(column: string, options: { ascending: boolean }) {
+      const sortedRows = [...filteredRows()].sort((left: ExportTableRow, right: ExportTableRow) => {
+        const leftValue = String(left[column] ?? "");
+        const rightValue = String(right[column] ?? "");
+        return options.ascending
+          ? leftValue.localeCompare(rightValue)
+          : rightValue.localeCompare(leftValue);
+      });
+
+      return Promise.resolve({ data: sortedRows, error: null });
+    },
     insert(payload: ExportTableRow | ExportTableRow[]) {
       const payloadRows = Array.isArray(payload) ? payload : [payload];
       const insertedRows = payloadRows.map((row, index) => ({
@@ -109,7 +124,7 @@ function createTableQuery(rows: ExportTableRow[]) {
       return createMutationResult(insertedRows);
     },
     single: async () => {
-      const row = rows.find((candidate) => filters.every((filter) => filter(candidate)));
+      const row = filteredRows()[0];
 
       return {
         data: row ?? null,
@@ -117,6 +132,10 @@ function createTableQuery(rows: ExportTableRow[]) {
       };
     },
   };
+
+  function filteredRows() {
+    return rows.filter((candidate) => filters.every((filter) => filter(candidate)));
+  }
 
   return query;
 }
@@ -358,28 +377,42 @@ describe("POST /api/exports", () => {
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
-  it("persists an export job and audits authorized valid requests", async () => {
-    const { db } = mockExportClient({ actorRole: "hr_central" });
+  it("returns CSV content, persists a completed export job, and audits authorized requests", async () => {
+    const { client, db } = mockExportClient({ actorRole: "hr_central" });
+    db.payroll_analytics_rows.push({
+      agency_id: AGENCY_ID,
+      agency_name: "Agence Antananarivo",
+      deductions_total: 100000,
+      employee_id: "EMP-001",
+      employee_name: "Employee One",
+      gross_amount: 1200000,
+      net_amount: 1100000,
+      period_end: "2026-06-30",
+      period_start: "2026-06-01",
+      published_at: "2026-06-27T10:00:00.000Z",
+    });
     const adminClient = mockAdminExportClient(db);
 
     const response = await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      data: {
-        exportJobId: "00000000-0000-0000-0000-800000000001",
-        exportType: "PUBLISHED_PAYSLIPS",
-        status: "PENDING",
-      },
-    });
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(response.headers.get("x-export-job-id")).toBe("00000000-0000-0000-0000-800000000001");
+    expect(response.headers.get("x-export-status")).toBe("COMPLETED");
+    const csv = await response.text();
+    expect(csv).toContain(
+      "agency_id,agency_name,employee_id,employee_name,period_start,period_end,gross_amount,deductions_total,net_amount,published_at",
+    );
+    expect(csv).toContain("Employee One");
     expect(adminMocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(client.from).toHaveBeenCalledWith("payroll_analytics_rows");
     expect(adminClient.from).toHaveBeenCalledWith("export_jobs");
     expect(db.export_jobs).toEqual([
       expect.objectContaining({
         agency_id: null,
         export_type: "PUBLISHED_PAYSLIPS",
         requested_by: ACTOR_PROFILE_ID,
-        status: "PENDING",
+        status: "COMPLETED",
       }),
     ]);
     expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
@@ -392,7 +425,7 @@ describe("POST /api/exports", () => {
           agencyId: null,
           exportJobId: "00000000-0000-0000-0000-800000000001",
           exportType: "PUBLISHED_PAYSLIPS",
-          status: "PENDING",
+          status: "COMPLETED",
         },
         resourceId: "00000000-0000-0000-0000-800000000001",
         resourceType: "export_job",

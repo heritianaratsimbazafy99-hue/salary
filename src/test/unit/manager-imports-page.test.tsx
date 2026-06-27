@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({
     throw new Error("NEXT_NOT_FOUND");
   }),
   redirect: managerImportsPageMocks.redirect,
+  usePathname: () => "/manager/imports",
 }));
 
 vi.mock("@/lib/admin/auth", () => ({
@@ -154,6 +155,7 @@ describe("ManagerImportDetailPage", () => {
           },
         },
       ],
+      mappedColumns: [],
     });
     managerImportsPageMocks.getCurrentAgencyScopedActor.mockResolvedValue({
       agencyId: AGENCY_ID,
@@ -211,6 +213,7 @@ describe("ManagerImportDetailPage", () => {
           },
         },
       ],
+      mappedColumns: [],
     });
     managerImportsPageMocks.getCurrentAgencyScopedActor.mockResolvedValue({
       agencyId: AGENCY_ID,
@@ -234,12 +237,14 @@ function createManagerImportsClient(input: {
   errors?: unknown[];
   importRecord?: unknown;
   importRows?: unknown[];
+  mappedColumns?: unknown[];
   previewRows?: unknown[];
 }) {
   const importsQuery = createRowsQuery(input.importRows ?? []);
   const importDetailQuery = createSingleQuery(input.importRecord ?? null);
   const errorsQuery = createRowsQuery(input.errors ?? []);
   const rowsQuery = createRowsQuery(input.previewRows ?? []);
+  const mappedColumnsQuery = createRowsQuery(input.mappedColumns ?? []);
 
   return {
     errorsQuery,
@@ -250,11 +255,13 @@ function createManagerImportsClient(input: {
 
       if (table === "payroll_import_errors") return errorsQuery;
       if (table === "payroll_import_rows") return rowsQuery;
+      if (table === "column_mappings") return mappedColumnsQuery;
 
       throw new Error(`Unexpected table ${table}`);
     }),
     importDetailQuery,
     importsQuery,
+    mappedColumnsQuery,
     rowsQuery,
   };
 }
@@ -263,6 +270,7 @@ function createRowsQuery(rows: unknown[]) {
   const result = Promise.resolve({ data: rows, error: null });
   const query = {
     eq: vi.fn(() => query),
+    in: vi.fn(() => query),
     limit: vi.fn(() => query),
     order: vi.fn(() => query),
     select: vi.fn(() => query),

@@ -1,5 +1,7 @@
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
+import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +16,10 @@ import {
 } from "@/components/ui/Table";
 import { requireCanAssignAgencyManager } from "@/lib/admin/auth";
 import { listAgencies } from "@/lib/admin/agencies";
+import {
+  AUTH_REQUIRED_ERROR_MESSAGE,
+  FORBIDDEN_ERROR_MESSAGE,
+} from "@/lib/admin/permissions";
 import { createAgencyManager } from "@/lib/admin/users";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +42,21 @@ async function createAgencyManagerAction(formData: FormData) {
 }
 
 export default async function UsersPage() {
-  const role = await requireCanAssignAgencyManager();
+  let role: Awaited<ReturnType<typeof requireCanAssignAgencyManager>>;
+
+  try {
+    role = await requireCanAssignAgencyManager();
+  } catch (error) {
+    if (hasErrorMessage(error, AUTH_REQUIRED_ERROR_MESSAGE)) {
+      redirect("/auth/login");
+    }
+
+    if (hasErrorMessage(error, FORBIDDEN_ERROR_MESSAGE)) {
+      return <ForbiddenUsersAccess />;
+    }
+
+    throw error;
+  }
 
   const agencies = await listAgencies();
   const hasAgencies = agencies.length > 0;
@@ -144,4 +164,12 @@ export default async function UsersPage() {
       </div>
     </AppShell>
   );
+}
+
+function ForbiddenUsersAccess() {
+  return <AccessDenied context="Administration RH" />;
+}
+
+function hasErrorMessage(error: unknown, message: string): error is Error {
+  return error instanceof Error && error.message === message;
 }

@@ -8,6 +8,7 @@ const employeePayslipsMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   redirect: employeePayslipsMocks.redirect,
+  usePathname: () => "/employee/payslips",
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -67,6 +68,7 @@ describe("EmployeePayslipsPage", () => {
           id: "00000000-0000-0000-0000-000000000401",
           period_end: "2026-06-30",
           period_start: "2026-06-01",
+          published_at: "2026-06-30T08:00:00.000Z",
         },
       ],
       profile: { id: PROFILE_ID, role: "employee" },
@@ -80,8 +82,12 @@ describe("EmployeePayslipsPage", () => {
     expect(client.from).toHaveBeenCalledWith("payslips");
     expect(client.payslipsQuery.eq).toHaveBeenCalledWith("employee.profile_id", PROFILE_ID);
     expect(screen.getByRole("heading", { name: "Rina Salary" })).toBeTruthy();
-    expect(screen.getByText("2026-06-01 - 2026-06-30")).toBeTruthy();
+    expect(screen.getAllByText("2026-06-01 - 2026-06-30")).toHaveLength(2);
     expect(screen.getByText("Prime transport")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Télécharger CSV/ }).getAttribute("href")).toBe(
+      "/api/employee/payslips/export",
+    );
+    expect(screen.getByRole("heading", { name: "Historique publié" })).toBeTruthy();
   });
 
   it("does not expose payslips to non-employee roles through the employee route", async () => {

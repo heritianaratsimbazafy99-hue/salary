@@ -3,7 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAppRole } from "@/lib/admin/permissions";
 import { recordAuditEvent } from "@/lib/audit/server";
 import { apiError } from "@/lib/errors";
-import { canCreateExport, type ExportType } from "@/lib/payroll/export";
+import {
+  buildImportReportCsv,
+  buildPublishedPayslipsCsv,
+  canCreateExport,
+  type ExportType,
+  type ImportReportExportRow,
+  type PublishedPayslipExportRow,
+} from "@/lib/payroll/export";
 import type { AppRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -50,6 +57,32 @@ type ExportJobRecord = {
   status?: unknown;
 };
 
+type ImportReportDbRow = {
+  agency_id?: unknown;
+  created_at?: unknown;
+  id?: unknown;
+  invalid_row_count?: unknown;
+  period_end?: unknown;
+  period_start?: unknown;
+  source_filename?: unknown;
+  status?: unknown;
+  unknown_employee_count?: unknown;
+  valid_row_count?: unknown;
+};
+
+type PublishedPayslipDbRow = {
+  agency_id?: unknown;
+  agency_name?: unknown;
+  deductions_total?: unknown;
+  employee_id?: unknown;
+  employee_name?: unknown;
+  gross_amount?: unknown;
+  net_amount?: unknown;
+  period_end?: unknown;
+  period_start?: unknown;
+  published_at?: unknown;
+};
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: userResult, error: authError } = await supabase.auth.getUser();
@@ -92,7 +125,12 @@ export async function POST(request: NextRequest) {
   }
 
   let exportJob;
+  let csvContent;
   try {
+    csvContent = await buildExportContent(supabase, {
+      agencyId: agencyId ?? null,
+      exportType,
+    });
     const admin = createAdminClient();
     exportJob = await createExportJob(admin, {
       actorProfileId: actor.id,
@@ -120,11 +158,15 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({
-    data: {
-      exportJobId: exportJob.id,
-      exportType: exportJob.exportType,
-      status: exportJob.status,
+  const filename = exportFilename(exportJob.exportType);
+
+  return new NextResponse(csvContent, {
+    headers: {
+      "content-disposition": `attachment; filename="${filename}"`,
+      "content-type": "text/csv; charset=utf-8",
+      "x-export-job-id": exportJob.id,
+      "x-export-status": exportJob.status,
+      "x-export-type": exportJob.exportType,
     },
   });
 }
@@ -143,7 +185,8 @@ async function createExportJob(
       agency_id: input.agencyId,
       export_type: input.exportType,
       requested_by: input.actorProfileId,
-      status: "PENDING",
+      completed_at: new Date().toISOString(),
+      status: "COMPLETED",
     })
     .select("id,status,export_type")
     .single();
@@ -152,7 +195,7 @@ async function createExportJob(
   if (
     error ||
     typeof exportJob?.id !== "string" ||
-    exportJob.status !== "PENDING" ||
+    exportJob.status !== "COMPLETED" ||
     !isExportType(exportJob.export_type)
   ) {
     throw new Error("Unable to create export job");
@@ -164,6 +207,123 @@ async function createExportJob(
     id: exportJob.id,
     status: exportJob.status,
   };
+}
+
+async function buildExportContent(
+  supabase: SupabaseServerClient,
+  input: { agencyId: string | null; exportType: ExportType },
+): Promise<string> {
+  if (input.exportType === "IMPORT_REPORT") {
+    return buildImportReportCsv(await loadImportReportRows(supabase, input.agencyId));
+  }
+
+  return buildPublishedPayslipsCsv(await loadPublishedPayslipRows(supabase, input.agencyId));
+}
+
+async function loadImportReportRows(
+  supabase: SupabaseServerClient,
+  agencyId: string | null,
+): Promise<ImportReportExportRow[]> {
+  const baseQuery = supabase
+    .from("payroll_imports")
+    .select(
+      "id,agency_id,period_start,period_end,status,source_filename,valid_row_count,invalid_row_count,unknown_employee_count,created_at",
+    );
+  const scopedQuery = agencyId ? baseQuery.eq("agency_id", agencyId) : baseQuery;
+  const { data, error } = await scopedQuery.order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Unable to load import report export rows.");
+  }
+
+  return ((data ?? []) as ImportReportDbRow[]).flatMap((row): ImportReportExportRow[] => {
+    if (
+      typeof row.id !== "string" ||
+      typeof row.agency_id !== "string" ||
+      typeof row.period_start !== "string" ||
+      typeof row.period_end !== "string" ||
+      typeof row.status !== "string" ||
+      typeof row.source_filename !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        agencyId: row.agency_id,
+        createdAt: typeof row.created_at === "string" ? row.created_at : "",
+        id: row.id,
+        invalidRowCount: countValue(row.invalid_row_count),
+        periodEnd: row.period_end,
+        periodStart: row.period_start,
+        sourceFilename: row.source_filename,
+        status: row.status,
+        unknownEmployeeCount: countValue(row.unknown_employee_count),
+        validRowCount: countValue(row.valid_row_count),
+      },
+    ];
+  });
+}
+
+async function loadPublishedPayslipRows(
+  supabase: SupabaseServerClient,
+  agencyId: string | null,
+): Promise<PublishedPayslipExportRow[]> {
+  const baseQuery = supabase
+    .from("payroll_analytics_rows")
+    .select(
+      "agency_id,agency_name,employee_id,employee_name,period_start,period_end,gross_amount,deductions_total,net_amount,published_at",
+    );
+  const scopedQuery = agencyId ? baseQuery.eq("agency_id", agencyId) : baseQuery;
+  const { data, error } = await scopedQuery.order("published_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Unable to load published payslip export rows.");
+  }
+
+  return ((data ?? []) as PublishedPayslipDbRow[]).flatMap((row): PublishedPayslipExportRow[] => {
+    if (
+      typeof row.agency_id !== "string" ||
+      typeof row.agency_name !== "string" ||
+      typeof row.employee_id !== "string" ||
+      typeof row.employee_name !== "string" ||
+      typeof row.period_start !== "string" ||
+      typeof row.period_end !== "string" ||
+      typeof row.published_at !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        agencyId: row.agency_id,
+        agencyName: row.agency_name,
+        deductionsTotal: countValue(row.deductions_total),
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        grossAmount: countValue(row.gross_amount),
+        netAmount: countValue(row.net_amount),
+        periodEnd: row.period_end,
+        periodStart: row.period_start,
+        publishedAt: row.published_at,
+      },
+    ];
+  });
+}
+
+function exportFilename(exportType: ExportType) {
+  const suffix = new Date().toISOString().slice(0, 10);
+  return `${exportType.toLowerCase()}-${suffix}.csv`;
+}
+
+function countValue(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return 0;
 }
 
 async function loadExportActor(

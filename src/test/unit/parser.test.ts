@@ -26,6 +26,12 @@ describe("parsePayrollRowsFromObjects", () => {
     expect(result.unknownColumns).toEqual(["prime_transport"]);
   });
 
+  it("normalizes employee ids to uppercase", () => {
+    const result = parsePayrollRowsFromObjects([{ ...validPayrollRow, employee_id: " emp-001 " }]);
+
+    expect(result.validRows[0]?.data.employeeId).toBe("EMP-001");
+  });
+
   it("imports valid rows and records invalid row errors", () => {
     const result = parsePayrollRowsFromObjects([
       validPayrollRow,

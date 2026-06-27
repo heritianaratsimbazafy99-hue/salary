@@ -165,7 +165,7 @@ export function HeroShowcase() {
               </div>
               <span className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-foreground shadow-[var(--shadow-xs)]">
                 <Download className="size-3.5 text-primary" aria-hidden="true" />
-                PDF
+                CSV
               </span>
             </div>
           </div>

@@ -98,6 +98,7 @@ Employees authenticate with Supabase magic links and are linked by:
 Employees can:
 
 - View only their own currently published web payslips.
+- Download a CSV summary of their own published payslips.
 - Receive email notification after a new payslip is published.
 
 Employees cannot:
@@ -105,7 +106,7 @@ Employees cannot:
 - See replaced historical versions.
 - See other employees.
 - Upload files.
-- Export payroll data.
+- Export another employee's payroll data or global payroll data.
 - Access analytics.
 - Download PDFs in the MVP.
 

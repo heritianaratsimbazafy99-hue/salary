@@ -23,7 +23,7 @@ function parseMappedAmount(rawValue: unknown): number | undefined {
     const trimmedValue = rawValue.trim();
     if (trimmedValue.length === 0) return undefined;
 
-    const numericValue = Number(trimmedValue);
+    const numericValue = Number(trimmedValue.replace(/\s/g, "").replace(",", "."));
     return Number.isFinite(numericValue) ? numericValue : undefined;
   }
 

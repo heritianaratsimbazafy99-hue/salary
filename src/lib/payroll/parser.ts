@@ -45,7 +45,7 @@ export function parsePayrollRowsFromObjects(rows: RawRow[]): PayrollParseResult 
     });
 
     const normalized = {
-      employeeId: stringValue(row.employee_id),
+      employeeId: normalizeEmployeeId(row.employee_id),
       email: stringValue(row.email).toLowerCase(),
       periodStart: stringValue(row.period_start),
       periodEnd: stringValue(row.period_end),
@@ -93,6 +93,10 @@ export function parsePayrollRowsFromObjects(rows: RawRow[]): PayrollParseResult 
 
 function stringValue(value: unknown): string {
   return value == null ? "" : String(value).trim();
+}
+
+function normalizeEmployeeId(value: unknown): string {
+  return stringValue(value).toUpperCase();
 }
 
 function optionalString(value: unknown): string | undefined {

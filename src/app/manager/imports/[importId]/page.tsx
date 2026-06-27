@@ -107,9 +107,11 @@ export default async function ImportDetailPage({ params }: PageProps) {
       importId: normalizedImportId,
     }),
   ]);
-  const unknownColumns = uniqueSortedColumns(
+  const allUnknownColumns = uniqueSortedColumns(
     previewRows.flatMap((row) => Object.keys(row.rawUnknownColumns)),
   );
+  const mappedColumns = await loadMappedColumns(supabase, actor.agencyId, allUnknownColumns);
+  const unknownColumns = allUnknownColumns.filter((column) => !mappedColumns.has(column));
 
   return (
     <AppShell role={actor.role}>
@@ -333,6 +335,37 @@ async function loadPayrollImportRows(
       },
     ];
   });
+}
+
+async function loadMappedColumns(
+  supabase: { from: (table: string) => unknown },
+  agencyId: string,
+  columns: string[],
+): Promise<Set<string>> {
+  if (columns.length === 0) return new Set();
+
+  const query = supabase.from("column_mappings") as {
+    select: (selectColumns: string) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => { in: (column: string, values: string[]) => Promise<{ data: unknown; error: unknown }> };
+    };
+  };
+  const { data, error } = await query
+    .select("source_column")
+    .eq("agency_id", agencyId)
+    .in("source_column", columns);
+
+  if (error) {
+    throw new Error("Impossible de charger les mappings de colonnes.");
+  }
+
+  return new Set(
+    ((data ?? []) as Array<{ source_column?: unknown }>).flatMap((row) =>
+      typeof row.source_column === "string" ? [row.source_column] : [],
+    ),
+  );
 }
 
 function ForbiddenManagerAccess() {
