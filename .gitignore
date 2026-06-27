@@ -5,6 +5,8 @@ coverage
 playwright-report
 test-results
 *.tsbuildinfo
+.DS_Store
+.worktrees
 supabase/.branches
 supabase/.temp
 .env

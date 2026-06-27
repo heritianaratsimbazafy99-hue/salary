@@ -13,14 +13,19 @@ This runbook is the functional release gate for the payroll platform. Resend liv
 Run these before shipping or opening a production PR:
 
 ```bash
-npm run verify
+npm run verify:ci
+supabase start
+supabase db reset --local
 npm run test:e2e
 supabase db advisors --local --type all --level warn --fail-on error
-npm audit --audit-level=high
 git diff --check
 ```
 
-`npm run verify:full` runs lint, typecheck, unit/integration tests, build, E2E, and a high-severity npm audit.
+`npm run verify:ci` runs secret scanning, lint, typecheck, unit/integration tests, build, and a high-severity npm audit.
+
+`npm run verify:full` runs secret scanning, lint, typecheck, unit/integration tests, build, E2E, Supabase advisors, and a high-severity npm audit.
+
+Run `npm run verify:prod-env` in an environment containing production variables before the first production deployment. Resend remains excluded.
 
 ## Manual Smoke
 
@@ -34,6 +39,12 @@ git diff --check
 ## Resend Exclusion
 
 Resend delivery is not part of this launch gate yet. Keep `RESEND_API_KEY` unset locally unless testing email delivery specifically. The health endpoint reports `email: "resend_excluded"` so monitoring does not confuse this deliberate exclusion with an outage.
+
+## Production Lockdown References
+
+- Production readiness checklist: `docs/verification/production-readiness.md`
+- Backup and restore runbook: `docs/operations/supabase-backup-restore.md`
+- PDF export improvement plan: `docs/superpowers/plans/2026-06-27-pdf-export-improvement.md`
 
 ## Rollback
 
