@@ -23,6 +23,10 @@ const auditMocks = vi.hoisted(() => ({
   recordAuditEvent: vi.fn(),
 }));
 
+const notificationMocks = vi.hoisted(() => ({
+  sendPayslipPublishedEmail: vi.fn(),
+}));
+
 vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -35,6 +39,10 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/audit/server", () => ({
   recordAuditEvent: auditMocks.recordAuditEvent,
+}));
+
+vi.mock("@/lib/notifications/resend-server", () => ({
+  sendPayslipPublishedEmail: notificationMocks.sendPayslipPublishedEmail,
 }));
 
 type PublishTableRow = Record<string, unknown>;
@@ -189,6 +197,10 @@ function createSelectQuery(rows: PublishTableRow[]) {
       filters.push((row) => row[column] === value);
       return query;
     },
+    in(column: string, values: unknown[]) {
+      filters.push((row) => values.includes(row[column]));
+      return query;
+    },
     maybeSingle: async () => ({ data: filteredRows()[0] ?? null, error: null }),
     single: async () => {
       const row = filteredRows()[0];
@@ -314,6 +326,31 @@ function seedPublishImport(
   });
 }
 
+function seedPublishedNotification(db: PublishTestDb, input: {
+  importId?: string;
+  notificationId?: string;
+  payslipId?: string;
+  recipientEmail?: string;
+} = {}) {
+  const payslipId = input.payslipId ?? "00000000-0000-0000-0000-000000000801";
+
+  db.payslip_versions.push({
+    agency_id: AGENCY_ID,
+    id: "00000000-0000-0000-0000-000000000802",
+    import_id: input.importId ?? IMPORT_ID,
+    payslip_id: payslipId,
+    version_number: 1,
+  });
+  db.notifications.push({
+    id: input.notificationId ?? "00000000-0000-0000-0000-000000000901",
+    notification_type: "PAYSLIP_PUBLISHED",
+    recipient_email: input.recipientEmail ?? "employee@example.com",
+    resource_id: payslipId,
+    resource_type: "payslip",
+    status: "PENDING",
+  });
+}
+
 describe("nextVersionNumber", () => {
   it("starts at version one", () => {
     expect(nextVersionNumber([])).toBe(1);
@@ -329,6 +366,11 @@ describe("POST /api/imports/:importId/publish", () => {
     adminMocks.createAdminClient.mockReset();
     supabaseMocks.createClient.mockReset();
     auditMocks.recordAuditEvent.mockReset();
+    notificationMocks.sendPayslipPublishedEmail.mockReset();
+    notificationMocks.sendPayslipPublishedEmail.mockResolvedValue({
+      data: { id: "email-message-id" },
+      error: null,
+    });
   });
 
   it("returns 401 and UNAUTHORIZED for unauthenticated requests", async () => {
@@ -434,6 +476,7 @@ describe("POST /api/imports/:importId/publish", () => {
       normalized_data: { employeeId: "EMP-001", netAmount: 1100000 },
       pay_items: [],
     });
+    seedPublishedNotification(db);
     const adminClient = createAdminPublishClient(db);
     adminMocks.createAdminClient.mockReturnValue(adminClient);
 
@@ -482,8 +525,64 @@ describe("POST /api/imports/:importId/publish", () => {
       expect.objectContaining({
         action: "PAYROLL_IMPORT_PUBLISHED",
         metadata: expect.objectContaining({
+          emailFailedCount: 0,
+          emailSentCount: 1,
+          notificationCount: 1,
           rowCount: 1,
           status: "PUBLISHED",
+        }),
+      }),
+    );
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith({
+      employeeName: "Employee One",
+      to: "employee@example.com",
+    });
+    expect(db.notifications[0]).toMatchObject({
+      failed_at: null,
+      failure_reason: null,
+      provider_message_id: "email-message-id",
+      status: "SENT",
+    });
+    expect(db.notifications[0].sent_at).toEqual(expect.any(String));
+  });
+
+  it("marks notification delivery failures without failing publication", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID,
+      employee_email: "employee@example.com",
+      employee_id: "EMP-001",
+      employee_name: "Employee One",
+      import_id: IMPORT_ID,
+      normalized_data: { employeeId: "EMP-001", netAmount: 1100000 },
+      pay_items: [],
+    });
+    seedPublishedNotification(db);
+    notificationMocks.sendPayslipPublishedEmail.mockRejectedValueOnce(new Error("Resend unavailable"));
+    adminMocks.createAdminClient.mockReturnValue(createAdminPublishClient(db));
+
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        importId: IMPORT_ID,
+        publishedCount: 1,
+        status: "PUBLISHED",
+      },
+    });
+    expect(db.notifications[0]).toMatchObject({
+      failure_reason: "Resend unavailable",
+      status: "FAILED",
+    });
+    expect(db.notifications[0].failed_at).toEqual(expect.any(String));
+    expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          emailFailedCount: 1,
+          emailSentCount: 0,
+          notificationCount: 1,
         }),
       }),
     );

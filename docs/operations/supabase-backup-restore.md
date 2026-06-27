@@ -1,6 +1,6 @@
 # Supabase Backup And Restore Runbook
 
-This runbook locks the database operations required before production. Monitoring and Resend delivery are intentionally out of scope for this pass.
+This runbook locks the database operations required before production. Monitoring is covered by Sentry, and email delivery is covered by the Resend release gate.
 
 ## Production Backup Requirements
 

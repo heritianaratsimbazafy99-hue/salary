@@ -8,7 +8,7 @@ test("health endpoint reports configured local services", async ({ request }) =>
   expect(await response.json()).toMatchObject({
     checks: {
       app: "ok",
-      email: "resend_excluded",
+      email: "configured",
       supabase: "ok",
     },
     status: "ok",

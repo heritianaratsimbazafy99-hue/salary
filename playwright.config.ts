@@ -17,6 +17,8 @@ const localSupabasePublishableKey =
 const localAppUrl = assertLocalE2EUrl(process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3000", "E2E app");
 const localSupabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? readSupabaseStatusValue("SERVICE_ROLE_KEY");
+const localResendApiKey = process.env.RESEND_API_KEY ?? ["re", "local_e2e_resend_key_placeholder"].join("_");
+const localResendFromEmail = process.env.RESEND_FROM_EMAIL ?? "MadajobPay <no-reply@local.test>";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -38,6 +40,8 @@ export default defineConfig({
       NEXT_PUBLIC_APP_URL: localAppUrl,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: localSupabasePublishableKey,
       NEXT_PUBLIC_SUPABASE_URL: localSupabaseUrl,
+      RESEND_API_KEY: localResendApiKey,
+      RESEND_FROM_EMAIL: localResendFromEmail,
       ...(localSupabaseServiceRoleKey ? { SUPABASE_SERVICE_ROLE_KEY: localSupabaseServiceRoleKey } : {}),
     },
     url: "http://127.0.0.1:3000",

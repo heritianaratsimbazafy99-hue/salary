@@ -1,6 +1,6 @@
 # Launch Verification Runbook
 
-This runbook is the functional release gate for the payroll platform. Sentry monitoring is included. Resend live delivery is intentionally excluded for now; email templates and notification records can be verified, but external delivery is not a blocker.
+This runbook is the functional release gate for the payroll platform. Sentry monitoring and Resend live delivery are included.
 
 ## Required Local Services
 
@@ -25,21 +25,38 @@ git diff --check
 
 `npm run verify:full` runs secret scanning, lint, typecheck, unit/integration tests, build, E2E, Supabase advisors, and a high-severity npm audit.
 
-Run `npm run verify:prod-env` in an environment containing production variables before the first production deployment. Sentry variables are required; Resend remains excluded.
+Run `npm run verify:prod-env` in an environment containing production variables before the first production deployment. Sentry and Resend variables are required.
 
 ## Manual Smoke
 
-1. Open `/api/health` and expect HTTP `200` with `status: "ok"`.
+1. Open `/api/health` and expect HTTP `200` with `status: "ok"` and `checks.email: "configured"`.
 2. Sign in as an agency manager.
 3. Upload a payroll workbook with a mapped unknown column.
 4. Save mappings and publish the import.
 5. Sign in as the generated employee and confirm the payslip, history, and CSV download.
 6. Sign in as HR and confirm analytics and audit entries.
 7. Trigger one controlled non-sensitive test exception in a preview or staging deployment and confirm it appears in Sentry project `salary`.
+8. Send one non-sensitive Resend smoke email from the verified production sender to an authorized test recipient.
 
-## Resend Exclusion
+## Resend Production Delivery
 
-Resend delivery is not part of this launch gate yet. Keep `RESEND_API_KEY` unset locally unless testing email delivery specifically. The health endpoint reports `email: "resend_excluded"` so monitoring does not confuse this deliberate exclusion with an outage.
+Resend delivery is part of the launch gate. Keep `RESEND_API_KEY` server-only and store it in Vercel as a sensitive Production and Preview variable.
+
+Required application variables:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+
+Supabase Auth must also use custom SMTP for magic links and account emails:
+
+- host: `smtp.resend.com`
+- port: `465`
+- username: `resend`
+- password: the Resend API key
+- sender name: `MadajobPay`
+- sender email: the verified sender configured in `RESEND_FROM_EMAIL`
+
+Do not use `onboarding@resend.dev` for production. If no Resend sender domain is verified, launch is blocked until DNS verification is complete.
 
 ## Sentry Monitoring
 
