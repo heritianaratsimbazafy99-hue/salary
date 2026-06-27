@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const connectSources = [
   "'self'",
@@ -63,4 +64,27 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const canUploadSentrySourceMaps = Boolean(
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT,
+);
+
+export default withSentryConfig(nextConfig, {
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  release: {
+    create: canUploadSentrySourceMaps,
+  },
+  silent: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+    disable: !canUploadSentrySourceMaps,
+  },
+  telemetry: false,
+  widenClientFileUpload: true,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+});
