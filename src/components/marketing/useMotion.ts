@@ -44,6 +44,50 @@ export function useCountUp(target: number, start: boolean, durationMs = 1400) {
 }
 
 /**
+ * Auto-advancing index for a looping, self-playing sequence (e.g. a guided
+ * product demo). Advances every `stepMs` while `start` is true, wrapping around
+ * `length`. `tick` increments on every advance so callers can use it as a React
+ * key to replay a step's entrance choreography even when the index repeats.
+ *
+ * Honours reduced motion: parks on `restIndex` (the payoff frame) and reports
+ * `cycling: false` so callers can render a calm, static composition instead.
+ */
+export function useSequence(
+  length: number,
+  stepMs: number,
+  start: boolean,
+  restIndex = 0,
+) {
+  const [state, setState] = useState({ index: restIndex, tick: 0 });
+  const [cycling, setCycling] = useState(false);
+
+  useEffect(() => {
+    if (!start) return;
+
+    // Defer the initial state sync out of the effect body to avoid a cascading
+    // render (mirrors useCountUp's reduced-motion handling).
+    if (prefersReducedMotion()) {
+      const raf = requestAnimationFrame(() => {
+        setCycling(false);
+        setState({ index: restIndex, tick: 0 });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+
+    const raf = requestAnimationFrame(() => setCycling(true));
+    const id = setInterval(() => {
+      setState((prev) => ({ index: (prev.index + 1) % length, tick: prev.tick + 1 }));
+    }, stepMs);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(id);
+    };
+  }, [length, stepMs, start, restIndex]);
+
+  return { index: state.index, tick: state.tick, cycling };
+}
+
+/**
  * Fires `true` once the element scrolls into view (or immediately if
  * IntersectionObserver is unavailable). One-shot — used to gate entrance motion.
  */

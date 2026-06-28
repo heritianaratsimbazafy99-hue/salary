@@ -357,6 +357,195 @@ body {
 }
 
 /* ----------------------------------------------------------------------------
+   Hero walkthrough — a self-playing guided demo of the salarié journey
+   (magic-link login → see salary → history → download PDF). Each step remounts,
+   so its entrance choreography replays every loop.
+---------------------------------------------------------------------------- */
+@keyframes hero-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes hero-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-line {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes hero-cursor {
+  0% {
+    opacity: 0;
+    transform: translate(34px, 46px) scale(1);
+  }
+  18% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+    transform: translate(2px, 6px) scale(1);
+  }
+  64% {
+    transform: translate(2px, 6px) scale(0.8);
+  }
+  74% {
+    transform: translate(2px, 6px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(2px, 6px) scale(1);
+  }
+}
+
+@keyframes hero-ripple {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  10% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
+}
+
+@keyframes hero-press {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(0.97);
+    filter: brightness(1.04);
+  }
+}
+
+@keyframes hero-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hero-dl-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hero-fade-out {
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.hero-screen {
+  animation: hero-screen-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-caption {
+  animation: hero-caption-in 0.5s ease-out both;
+}
+
+.hero-fill {
+  transform: scaleX(0);
+  animation: hero-fill var(--step-dur, 3600ms) linear both;
+}
+
+.hero-row {
+  animation: hero-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-line {
+  transform: scaleX(0);
+  animation: hero-line 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-cursor {
+  animation: hero-cursor 1.7s cubic-bezier(0.5, 0, 0.2, 1) both;
+}
+
+.hero-ripple {
+  opacity: 0;
+  animation: hero-ripple 0.7s ease-out 1.05s both;
+}
+
+.hero-press {
+  animation: hero-press 0.4s ease-in-out 1.05s both;
+}
+
+.hero-success {
+  opacity: 0;
+  animation: hero-pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.5s both;
+}
+
+.hero-dl-ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hero-dl-ring 1.3s cubic-bezier(0.4, 0, 0.2, 1) 1.2s both;
+}
+
+.hero-dl-icon {
+  animation: hero-fade-out 0.3s ease 2.4s both;
+}
+
+.hero-dl-check {
+  opacity: 0;
+  animation: hero-pop-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) 2.5s both;
+}
+
+/* ----------------------------------------------------------------------------
    Marquee — quiet trust strip
 ---------------------------------------------------------------------------- */
 @keyframes marquee-scroll {
@@ -396,6 +585,18 @@ body {
   .hero-chip,
   .hero-ring,
   .badge-twinkle,
+  .hero-screen,
+  .hero-caption,
+  .hero-fill,
+  .hero-row,
+  .hero-line,
+  .hero-cursor,
+  .hero-ripple,
+  .hero-press,
+  .hero-success,
+  .hero-dl-ring,
+  .hero-dl-icon,
+  .hero-dl-check,
   .marquee-track {
     animation: none !important;
   }
@@ -413,7 +614,25 @@ body {
     display: none;
   }
 
-  .hero-ring {
+  .hero-ring,
+  .hero-dl-ring {
     stroke-dashoffset: 0;
+  }
+
+  /* Static, fully-legible fallbacks for the walkthrough's parked salary frame */
+  .hero-fill,
+  .hero-line,
+  .hero-row,
+  .hero-caption,
+  .hero-screen {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-cursor,
+  .hero-ripple,
+  .hero-success,
+  .hero-dl-check {
+    opacity: 0;
   }
 }
