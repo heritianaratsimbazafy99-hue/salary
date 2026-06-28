@@ -5,6 +5,7 @@ import type { AgencyScopedActor } from "@/lib/admin/auth";
 import { applyColumnMappings, type ColumnMapping } from "@/lib/payroll/mapping";
 import { parsePayrollRowsFromObjects } from "@/lib/payroll/parser";
 import { PAY_ITEM_CATEGORIES, type PayItemCategory, type PayrollRowError } from "@/lib/payroll/schema";
+import { assertSafeXlsxContainer } from "@/lib/payroll/xlsx-guard";
 
 export type ImportSummaryInput = {
   validRows: { employeeId: string }[];
@@ -175,6 +176,8 @@ export async function persistPayrollImport(input: {
 }
 
 async function readPayrollWorksheetRows(file: File): Promise<RawRow[]> {
+  await assertSafeXlsxContainer(file);
+
   const workbook = new ExcelJS.Workbook();
   const buffer = (await file.arrayBuffer()) as Parameters<typeof workbook.xlsx.load>[0];
   await workbook.xlsx.load(buffer);
