@@ -172,11 +172,28 @@ function generatedIdFor(table: keyof ImportTestDb, index: number) {
   return `00000000-0000-0000-0000-90000000000${index}`;
 }
 
-function createImportRequest(formData: FormData, headers = new Headers()) {
+function createImportRequest(formData: FormData, headers = createMultipartHeaders(formData)) {
   return {
     formData: vi.fn(async () => formData),
     headers,
   } as unknown as NextRequest;
+}
+
+function createMultipartHeaders(formData: FormData) {
+  return new Headers({
+    "content-length": String(estimateMultipartContentLength(formData)),
+    "content-type": "multipart/form-data; boundary=import-flow-test",
+  });
+}
+
+function estimateMultipartContentLength(formData: FormData) {
+  let contentLength = 1024;
+
+  for (const value of formData.values()) {
+    contentLength += value instanceof File ? value.size : value.length;
+  }
+
+  return contentLength;
 }
 
 function createAuthorizedImportClient(options: {
@@ -371,6 +388,82 @@ describe("POST /api/imports", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_ERROR" },
     });
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing content length before parsing multipart bodies", async () => {
+    createAuthorizedImportClient();
+
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([validPayrollRow]));
+    const request = createImportRequest(formData, new Headers());
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects nonnumeric content length before parsing multipart bodies", async () => {
+    createAuthorizedImportClient();
+
+    const headers = new Headers({ "content-length": "not-a-number" });
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([validPayrollRow]));
+    const request = createImportRequest(formData, headers);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects negative content length before parsing multipart bodies", async () => {
+    createAuthorizedImportClient();
+
+    const headers = new Headers({
+      "content-length": "-1",
+      "content-type": "multipart/form-data; boundary=import-flow-test",
+    });
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([validPayrollRow]));
+    const request = createImportRequest(formData, headers);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-decimal content length before parsing multipart bodies", async () => {
+    createAuthorizedImportClient();
+
+    const headers = new Headers({
+      "content-length": "1e3",
+      "content-type": "multipart/form-data; boundary=import-flow-test",
+    });
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([validPayrollRow]));
+    const request = createImportRequest(formData, headers);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
+    expect(request.formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects multipart content type without a boundary before parsing bodies", async () => {
+    createAuthorizedImportClient();
+
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([validPayrollRow]));
+    const headers = createMultipartHeaders(formData);
+    headers.set("content-type", "multipart/form-data; charset=utf-8");
+    const request = createImportRequest(formData, headers);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(422);
     expect(request.formData).not.toHaveBeenCalled();
   });
 
