@@ -18,17 +18,41 @@ const EXCEL_COMPATIBLE_MIME_TYPES = new Set([EXCEL_XLSX_MIME_TYPE, "application/
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function isContentLengthTooLarge(contentLength: string | null) {
-  if (!contentLength) {
-    return false;
+function parseAllowedContentLength(contentLength: string | null): number | null {
+  if (!contentLength) return null;
+
+  const trimmedLength = contentLength.trim();
+  if (!/^[0-9]+$/.test(trimmedLength)) {
+    return null;
   }
 
-  const parsedLength = Number(contentLength);
-  if (!Number.isFinite(parsedLength)) {
-    return false;
+  const parsedLength = Number(trimmedLength);
+  if (parsedLength > MAX_UPLOAD_BYTES + MAX_MULTIPART_OVERHEAD_BYTES) {
+    return null;
   }
 
-  return parsedLength > MAX_UPLOAD_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
+  return parsedLength;
+}
+
+function isMultipartFormData(contentType: string | null): boolean {
+  if (typeof contentType !== "string") return false;
+
+  const [mediaType, ...parameters] = contentType.split(";");
+  if (mediaType.trim().toLowerCase() !== "multipart/form-data") return false;
+
+  return parameters.some((parameter) => {
+    const [name, ...valueParts] = parameter.split("=");
+    if (name.trim().toLowerCase() !== "boundary") return false;
+
+    const boundary = valueParts.join("=").trim();
+    if (!boundary) return false;
+
+    if (boundary.startsWith('"') && boundary.endsWith('"')) {
+      return boundary.slice(1, -1).trim().length > 0;
+    }
+
+    return true;
+  });
 }
 
 function getTrimmedString(formData: FormData, key: string) {
@@ -48,8 +72,14 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (isContentLengthTooLarge(request.headers.get("content-length"))) {
-    return NextResponse.json(apiError("VALIDATION_ERROR", "File exceeds 10 MB limit"), {
+  if (parseAllowedContentLength(request.headers.get("content-length")) == null) {
+    return NextResponse.json(apiError("VALIDATION_ERROR", "Invalid upload size"), {
+      status: 422,
+    });
+  }
+
+  if (!isMultipartFormData(request.headers.get("content-type"))) {
+    return NextResponse.json(apiError("VALIDATION_ERROR", "Invalid upload content type"), {
       status: 422,
     });
   }
