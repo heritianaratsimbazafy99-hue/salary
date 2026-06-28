@@ -377,6 +377,33 @@ describe("POST /api/exports", () => {
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 
+  it("neutralizes formula-leading values in import report CSV exports", async () => {
+    const { client, db } = mockExportClient({ actorRole: "hr_central" });
+    db.payroll_imports.push({
+      agency_id: AGENCY_ID,
+      created_at: "2026-06-27T10:00:00.000Z",
+      id: "import-001",
+      invalid_row_count: 1,
+      period_end: "2026-06-30",
+      period_start: "2026-06-01",
+      source_filename: '=HYPERLINK("https://example.test","Open")',
+      status: "COMPLETED",
+      unknown_employee_count: 0,
+      valid_row_count: 10,
+    });
+    const adminClient = mockAdminExportClient(db);
+
+    const response = await POST(createExportRequest({ exportType: "IMPORT_REPORT" }));
+
+    expect(response.status).toBe(200);
+    const csv = await response.text();
+    expect(csv).toContain("'=HYPERLINK");
+    expect(csv).not.toContain("\n=HYPERLINK");
+    expect(csv).not.toContain(",=HYPERLINK");
+    expect(client.from).toHaveBeenCalledWith("payroll_imports");
+    expect(adminClient.from).toHaveBeenCalledWith("export_jobs");
+  });
+
   it("returns CSV content, persists a completed export job, and audits authorized requests", async () => {
     const { client, db } = mockExportClient({ actorRole: "hr_central" });
     db.payroll_analytics_rows.push({
@@ -384,7 +411,7 @@ describe("POST /api/exports", () => {
       agency_name: "Agence Antananarivo",
       deductions_total: 100000,
       employee_id: "EMP-001",
-      employee_name: "Employee One",
+      employee_name: '=HYPERLINK("https://example.test","Employee")',
       gross_amount: 1200000,
       net_amount: 1100000,
       period_end: "2026-06-30",
@@ -403,7 +430,9 @@ describe("POST /api/exports", () => {
     expect(csv).toContain(
       "agency_id,agency_name,employee_id,employee_name,period_start,period_end,gross_amount,deductions_total,net_amount,published_at",
     );
-    expect(csv).toContain("Employee One");
+    expect(csv).toContain("'=HYPERLINK");
+    expect(csv).not.toContain("\n=HYPERLINK");
+    expect(csv).not.toContain(",=HYPERLINK");
     expect(adminMocks.createAdminClient).toHaveBeenCalledOnce();
     expect(client.from).toHaveBeenCalledWith("payroll_analytics_rows");
     expect(adminClient.from).toHaveBeenCalledWith("export_jobs");
