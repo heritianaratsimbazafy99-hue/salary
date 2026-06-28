@@ -1,4 +1,5 @@
 import type { AppRole } from "@/lib/roles";
+import { toCsv } from "@/lib/payroll/csv";
 
 export type ExportType = "IMPORT_REPORT" | "PUBLISHED_PAYSLIPS";
 
@@ -105,15 +106,4 @@ export function buildPublishedPayslipsCsv(rows: PublishedPayslipExportRow[]): st
       row.publishedAt,
     ]),
   );
-}
-
-function toCsv(headers: string[], rows: Array<Array<number | string>>): string {
-  return [[...headers], ...rows].map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
-}
-
-function csvCell(value: number | string): string {
-  if (typeof value === "number") return String(value);
-
-  const escaped = value.replace(/"/g, '""');
-  return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
 }

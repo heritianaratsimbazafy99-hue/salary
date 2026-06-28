@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin/permissions";
 import { apiError } from "@/lib/errors";
 import { loadEmployeePayslips, type EmployeePayslip } from "@/lib/payslips/employee";
+import { toCsv } from "@/lib/payroll/csv";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -64,17 +65,6 @@ function buildEmployeePayslipsCsv(payslips: EmployeePayslip[]) {
 function formatPayItem(item: EmployeePayslip["payItems"][number]) {
   const value = "amount" in item ? item.amount : item.text;
   return `${item.label}: ${value}`;
-}
-
-function toCsv(headers: string[], rows: Array<Array<number | string>>): string {
-  return [[...headers], ...rows].map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
-}
-
-function csvCell(value: number | string): string {
-  if (typeof value === "number") return String(value);
-
-  const escaped = value.replace(/"/g, '""');
-  return /[",\n\r;]/.test(escaped) ? `"${escaped}"` : escaped;
 }
 
 function hasErrorMessage(error: unknown, message: string): error is Error {
