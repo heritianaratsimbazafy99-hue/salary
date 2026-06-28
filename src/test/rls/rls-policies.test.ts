@@ -2,9 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const rlsMigrationSql = readFileSync("supabase/migrations/202606260002_rls_policies.sql", "utf8")
-  .replace(/\s+/g, " ")
-  .toLowerCase();
+const importHardeningMigrationPath = "supabase/migrations/202606280001_security_findings_hardening.sql";
+const rlsMigrationSql = [
+  "supabase/migrations/202606260002_rls_policies.sql",
+  importHardeningMigrationPath,
+]
+  .filter((path) => existsSync(path))
+  .map((path) => readFileSync(path, "utf8").replace(/\s+/g, " ").toLowerCase())
+  .join(" ");
 
 const coreSchemaSql = readFileSync("supabase/migrations/202606260001_core_schema.sql", "utf8")
   .replace(/\s+/g, " ")
@@ -163,6 +168,18 @@ describe("RLS policy model", () => {
     expect(rlsMigrationSql).toContain("grant select, insert on table public.payroll_imports to authenticated;");
     expect(rlsMigrationSql).not.toContain("grant select, insert, update on table public.payroll_imports to authenticated;");
     expect(rlsMigrationSql).not.toContain("create policy imports_update_manager on public.payroll_imports");
+  });
+
+  it("revokes direct authenticated payroll import mutation grants after server-side hardening", () => {
+    expect(rlsMigrationSql).toContain(
+      "revoke insert on table public.payroll_imports from authenticated;",
+    );
+    expect(rlsMigrationSql).toContain(
+      "revoke insert, update on table public.payroll_import_rows from authenticated;",
+    );
+    expect(rlsMigrationSql).toContain("drop policy if exists imports_insert_manager on public.payroll_imports;");
+    expect(rlsMigrationSql).toContain("drop policy if exists import_rows_insert_manager on public.payroll_import_rows;");
+    expect(rlsMigrationSql).toContain("drop policy if exists import_rows_update_manager on public.payroll_import_rows;");
   });
 
   it("keeps RLS role helpers private security definer functions with scoped execute grants", () => {

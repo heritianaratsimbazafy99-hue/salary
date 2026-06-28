@@ -9,7 +9,7 @@ import {
 import { recordAuditEvent } from "@/lib/audit/server";
 import { apiError } from "@/lib/errors";
 import { persistPayrollImport } from "@/lib/payroll/import-service";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
@@ -122,14 +122,13 @@ export async function POST(request: NextRequest) {
       resourceType: "payroll_import",
     });
 
-    const supabase = await createClient();
     const summary = await persistPayrollImport({
       actor,
       agencyId,
       file,
       periodEnd,
       periodStart,
-      supabase,
+      supabase: createAdminClient(),
     });
 
     await recordAuditEvent({

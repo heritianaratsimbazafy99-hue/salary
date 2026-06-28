@@ -15,6 +15,10 @@ const supabaseMocks = vi.hoisted(() => ({
   createClient: vi.fn(),
 }));
 
+const supabaseAdminMocks = vi.hoisted(() => ({
+  createAdminClient: vi.fn(),
+}));
+
 const auditMocks = vi.hoisted(() => ({
   recordAuditEvent: vi.fn(),
 }));
@@ -23,6 +27,10 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: supabaseMocks.createClient,
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: supabaseAdminMocks.createAdminClient,
 }));
 
 vi.mock("@/lib/audit/server", () => ({
@@ -185,6 +193,12 @@ function createAuthorizedImportClient(options: {
     db,
   });
   supabaseMocks.createClient.mockResolvedValue(client);
+  supabaseAdminMocks.createAdminClient.mockReturnValue(
+    createSupabaseClient({
+      authUserId: null,
+      db,
+    }),
+  );
   return { client, db };
 }
 
@@ -241,6 +255,7 @@ describe("buildImportSummary", () => {
 describe("POST /api/imports", () => {
   beforeEach(() => {
     supabaseMocks.createClient.mockReset();
+    supabaseAdminMocks.createAdminClient.mockReset();
     auditMocks.recordAuditEvent.mockReset();
   });
 
@@ -416,6 +431,8 @@ describe("POST /api/imports", () => {
         validRowCount: 1,
       },
     });
+    expect(supabaseAdminMocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(db.payroll_imports).toHaveLength(1);
     expect(db.payroll_imports).toMatchObject([
       {
         agency_id: AGENCY_ID,
@@ -429,6 +446,7 @@ describe("POST /api/imports", () => {
         valid_row_count: 1,
       },
     ]);
+    expect(db.payroll_import_rows.length).toBeGreaterThan(0);
     expect(db.payroll_import_rows).toMatchObject([
       {
         agency_id: AGENCY_ID,
