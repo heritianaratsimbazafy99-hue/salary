@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -9,25 +10,30 @@ export type EmployeeIdentityInput = {
   employeeId: string;
   email: string;
   fullName: string;
+  invitedByProfileId?: string;
 };
 
-export type EmployeeIdentity = EmployeeIdentityInput;
+export type EmployeeIdentity = Omit<EmployeeIdentityInput, "invitedByProfileId">;
 
 export type LinkedEmployeeAuthProfile = Omit<EmployeeIdentity, "agencyId"> & {
   authUserId: string;
   profileId: string;
 };
 
-export type ProvisionedEmployeeAuthProfile = LinkedEmployeeAuthProfile & {
-  createdAuthUserId?: string;
-  createdProfileId?: string;
+export type ProvisionedEmployeeAuthProfile = {
+  authUserId: string | null;
+  email: string;
+  employeeId: string;
   employeeRollback: {
     identity: EmployeeIdentity;
     previousEmployee: ExistingEmployeeRecord | null;
   };
+  fullName: string;
+  invitationId?: string;
+  profileId: string | null;
 };
 
-type EmployeeProvisioningAdminClient = Pick<ReturnType<typeof createAdminClient>, "auth" | "from">;
+type EmployeeProvisioningAdminClient = Pick<ReturnType<typeof createAdminClient>, "from">;
 
 type AuthUserRecord = {
   id?: unknown;
@@ -57,8 +63,15 @@ type ExistingEmployeeRecord = {
   profileId: string | null;
 };
 
+type ExistingInvitationRecord = {
+  id: string;
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
 const EmployeeIdentityInputSchema = z.object({
-  agencyId: z.string().trim().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  agencyId: z.string().trim().regex(UUID_PATTERN),
   employeeId: z.string().trim().min(1).max(80),
   email: z
     .string()
@@ -66,6 +79,7 @@ const EmployeeIdentityInputSchema = z.object({
     .email()
     .transform((email) => email.toLowerCase()),
   fullName: z.string().trim().min(1).max(160),
+  invitedByProfileId: z.string().trim().regex(UUID_PATTERN).optional(),
 });
 
 export function normalizeEmployeeIdentity(input: EmployeeIdentityInput): EmployeeIdentity {
@@ -167,81 +181,46 @@ export async function ensureEmployeeAuthProfile(
   }
 
   const identity = normalizeEmployeeIdentity(parsedInput.data);
-  const existingProfile = await findEmployeeProfileByEmail(admin, identity.email);
   const previousEmployee = await findExistingEmployee(admin, identity);
+  const profileId = previousEmployee?.profileId ?? null;
+  const employeeRollback = {
+    identity,
+    previousEmployee,
+  };
 
-  if (existingProfile) {
-    await upsertLinkedEmployee(admin, {
-      identity,
-      profileId: existingProfile.profileId,
-    });
-
-    return {
-      authUserId: existingProfile.authUserId,
-      email: identity.email,
-      employeeRollback: {
-        identity,
-        previousEmployee,
-      },
-      employeeId: identity.employeeId,
-      fullName: identity.fullName,
-      profileId: existingProfile.profileId,
-    };
-  }
-
-  const { data: authUserData, error: authUserError } = await admin.auth.admin.createUser({
-    email: identity.email,
-    email_confirm: true,
-    user_metadata: {
-      employee_id: identity.employeeId,
-      full_name: identity.fullName,
-      role: "employee",
-    },
+  await upsertPublicationEmployee(admin, {
+    identity,
+    profileId,
   });
-  const authUser = authUserData.user as AuthUserRecord | null;
-  const authUserId = typeof authUser?.id === "string" ? authUser.id : null;
 
-  if (authUserError || !authUserId) {
-    throw new Error("Impossible de creer le compte salarie.");
-  }
+  let invitation: { invitationId?: string; token?: string } | null = null;
 
-  const { data: profileData, error: profileError } = await admin
-    .from("profiles")
-    .insert({
-      auth_user_id: authUserId,
-      email: identity.email,
-      full_name: identity.fullName,
-      role: "employee",
-    })
-    .select("id,auth_user_id,email,full_name,role")
-    .single();
-  const profile = profileData as ProfileRecord | null;
-  const profileId = typeof profile?.id === "string" ? profile.id : null;
-
-  if (profileError || !profileId) {
-    await admin.auth.admin.deleteUser(authUserId);
-    throw new Error("Impossible de creer le profil salarie.");
-  }
-
-  try {
-    await upsertLinkedEmployee(admin, { identity, profileId });
-  } catch (error) {
-    await admin.from("profiles").delete().eq("id", profileId);
-    await admin.auth.admin.deleteUser(authUserId);
-    throw error;
+  if (!profileId) {
+    try {
+      invitation = await upsertPendingEmployeeInvitation(admin, {
+        identity,
+        invitedBy: parsedInput.data.invitedByProfileId ?? "",
+      });
+    } catch (error) {
+      await rollbackEmployeeAuthProfileProvisioning(admin, {
+        authUserId: null,
+        email: identity.email,
+        employeeId: identity.employeeId,
+        employeeRollback,
+        fullName: identity.fullName,
+        profileId,
+      });
+      throw error;
+    }
   }
 
   return {
-    authUserId,
-    createdAuthUserId: authUserId,
-    createdProfileId: profileId,
+    authUserId: null,
     email: identity.email,
-    employeeRollback: {
-      identity,
-      previousEmployee,
-    },
+    employeeRollback,
     employeeId: identity.employeeId,
     fullName: identity.fullName,
+    invitationId: invitation?.invitationId,
     profileId,
   };
 }
@@ -272,46 +251,16 @@ export async function rollbackEmployeeAuthProfileProvisioning(
       .eq("employee_id", rollback.identity.employeeId);
   }
 
-  if (provisioned.createdProfileId) {
-    await admin.from("profiles").delete().eq("id", provisioned.createdProfileId);
+  if (provisioned.invitationId) {
+    await admin
+      .from("employee_invitations")
+      .update({
+        status: "REVOKED",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", provisioned.invitationId)
+      .eq("status", "PENDING");
   }
-
-  if (provisioned.createdAuthUserId) {
-    await admin.auth.admin.deleteUser(provisioned.createdAuthUserId);
-  }
-}
-
-async function findEmployeeProfileByEmail(
-  admin: EmployeeProvisioningAdminClient,
-  email: string,
-): Promise<{ authUserId: string; profileId: string } | null> {
-  const { data, error } = await admin
-    .from("profiles")
-    .select("id,auth_user_id,role")
-    .eq("email", email)
-    .maybeSingle();
-  const profile = data as ProfileRecord | null;
-
-  if (error) {
-    throw new Error("Impossible de charger le profil salarie.");
-  }
-
-  if (!profile) {
-    return null;
-  }
-
-  if (
-    profile.role !== "employee" ||
-    typeof profile.id !== "string" ||
-    typeof profile.auth_user_id !== "string"
-  ) {
-    throw new Error("Un profil non salarie utilise deja cet email.");
-  }
-
-  return {
-    authUserId: profile.auth_user_id,
-    profileId: profile.id,
-  };
 }
 
 async function findExistingEmployee(
@@ -352,9 +301,9 @@ async function findExistingEmployee(
   };
 }
 
-async function upsertLinkedEmployee(
+async function upsertPublicationEmployee(
   admin: EmployeeProvisioningAdminClient,
-  input: { identity: EmployeeIdentity; profileId: string },
+  input: { identity: EmployeeIdentity; profileId: string | null },
 ) {
   const { data, error } = await admin
     .from("employees")
@@ -369,17 +318,122 @@ async function upsertLinkedEmployee(
       },
       { onConflict: "agency_id,employee_id" },
     )
-    .select("employee_id,email,full_name,profile_id")
+    .select("employee_id,email,full_name,is_active,profile_id")
     .single();
   const employee = data as EmployeeRecord | null;
+  const employeeProfileId = typeof employee?.profile_id === "string" ? employee.profile_id : null;
 
   if (
     error ||
-    employee?.profile_id !== input.profileId ||
+    !employee ||
+    employeeProfileId !== input.profileId ||
     employee.employee_id !== input.identity.employeeId ||
     employee.email !== input.identity.email ||
-    employee.full_name !== input.identity.fullName
+    employee.full_name !== input.identity.fullName ||
+    employee.is_active !== true
   ) {
     throw new Error("Impossible de rattacher le salarie a son compte.");
   }
+}
+
+async function upsertPendingEmployeeInvitation(
+  admin: EmployeeProvisioningAdminClient,
+  input: { identity: EmployeeIdentity; invitedBy: string },
+) {
+  if (!UUID_PATTERN.test(input.invitedBy)) {
+    throw new Error("Impossible de creer l'invitation salarie.");
+  }
+
+  const existingInvitation = await findPendingEmployeeInvitation(admin, input.identity);
+  const token = randomUUID() + randomUUID();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + INVITATION_TTL_MS).toISOString();
+  const updatedAt = new Date().toISOString();
+
+  if (existingInvitation) {
+    const { data, error } = await admin
+      .from("employee_invitations")
+      .update({
+        email: input.identity.email,
+        employee_id: input.identity.employeeId,
+        full_name: input.identity.fullName,
+        invited_by: input.invitedBy,
+        expires_at: expiresAt,
+        updated_at: updatedAt,
+      })
+      .eq("id", existingInvitation.id)
+      .eq("status", "PENDING")
+      .select("id")
+      .single();
+
+    if (error || data?.id !== existingInvitation.id) {
+      throw new Error("Impossible de creer l'invitation salarie.");
+    }
+
+    return {
+      invitationId: undefined,
+      token: undefined,
+    };
+  }
+
+  const { data, error } = await admin
+    .from("employee_invitations")
+    .upsert(
+      {
+        agency_id: input.identity.agencyId,
+        email: input.identity.email,
+        employee_id: input.identity.employeeId,
+        full_name: input.identity.fullName,
+        invited_by: input.invitedBy,
+        status: "PENDING",
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+        updated_at: updatedAt,
+      },
+      { ignoreDuplicates: true, onConflict: "agency_id,employee_id,status" },
+    )
+    .select("id")
+    .single();
+
+  if (error || typeof data?.id !== "string") {
+    throw new Error("Impossible de creer l'invitation salarie.");
+  }
+
+  return {
+    invitationId: existingInvitation ? undefined : data.id,
+    token,
+  };
+}
+
+async function findPendingEmployeeInvitation(
+  admin: EmployeeProvisioningAdminClient,
+  identity: EmployeeIdentity,
+): Promise<ExistingInvitationRecord | null> {
+  const { data, error } = await admin
+    .from("employee_invitations")
+    .select("id")
+    .eq("agency_id", identity.agencyId)
+    .eq("employee_id", identity.employeeId)
+    .eq("status", "PENDING")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Impossible de charger l'invitation salarie.");
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  if (typeof data.id !== "string") {
+    throw new Error("Invitation salarie invalide.");
+  }
+
+  return {
+    id: data.id,
+  };
+}
+
+async function sha256Hex(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
