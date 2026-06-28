@@ -106,6 +106,7 @@ export async function publishPayrollImport(input: {
             email: employee.email,
             employeeId: employee.employeeId,
             fullName: employee.fullName,
+            invitedByProfileId: input.actor.id,
           },
           writeSupabase,
         ),

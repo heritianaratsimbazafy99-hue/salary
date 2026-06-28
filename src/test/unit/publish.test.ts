@@ -52,6 +52,7 @@ type PublishTestDb = {
   agency_memberships: PublishTableRow[];
   payroll_imports: PublishTableRow[];
   payroll_import_rows: PublishTableRow[];
+  employee_invitations: PublishTableRow[];
   employees: PublishTableRow[];
   payslips: PublishTableRow[];
   payslip_versions: PublishTableRow[];
@@ -61,6 +62,7 @@ type PublishTestDb = {
 function createPublishDb(): PublishTestDb {
   return {
     agency_memberships: [],
+    employee_invitations: [],
     employees: [],
     notifications: [],
     payroll_import_rows: [],
@@ -246,6 +248,7 @@ function createUpdateQuery(rows: PublishTableRow[], payload: PublishTableRow) {
 
 function generatedIdFor(table: keyof PublishTestDb, index: number) {
   if (table === "employees") return `00000000-0000-0000-0000-60000000000${index}`;
+  if (table === "employee_invitations") return `00000000-0000-0000-0000-65000000000${index}`;
   if (table === "payslips") return `00000000-0000-0000-0000-70000000000${index}`;
   if (table === "payslip_versions") return `00000000-0000-0000-0000-80000000000${index}`;
   if (table === "notifications") return `00000000-0000-0000-0000-90000000000${index}`;
@@ -495,21 +498,13 @@ describe("POST /api/imports/:importId/publish", () => {
       p_actor_profile_id: ACTOR_PROFILE_ID,
       p_import_id: IMPORT_ID,
     });
-    expect(adminClient.auth.admin.createUser).toHaveBeenCalledWith({
-      email: "employee@example.com",
-      email_confirm: true,
-      user_metadata: {
-        employee_id: "EMP-001",
-        full_name: "Employee One",
-        role: "employee",
-      },
-    });
-    expect(db.profiles).toContainEqual(
+    expect(adminClient.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(db.employee_invitations).toContainEqual(
       expect.objectContaining({
-        auth_user_id: "00000000-0000-0000-0000-000000000701",
+        agency_id: AGENCY_ID,
         email: "employee@example.com",
-        full_name: "Employee One",
-        role: "employee",
+        employee_id: "EMP-001",
+        status: "PENDING",
       }),
     );
     expect(db.employees).toContainEqual(
@@ -519,6 +514,7 @@ describe("POST /api/imports/:importId/publish", () => {
         employee_id: "EMP-001",
         full_name: "Employee One",
         is_active: true,
+        profile_id: null,
       }),
     );
     expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(
@@ -614,9 +610,10 @@ describe("POST /api/imports/:importId/publish", () => {
       error: { code: "INTERNAL_ERROR" },
     });
     expect(adminClient.rpc).toHaveBeenCalledOnce();
+    expect(adminClient.auth.admin.createUser).not.toHaveBeenCalled();
     expect(db.profiles).not.toContainEqual(expect.objectContaining({ email: "employee@example.com" }));
     expect(db.employees).toHaveLength(0);
-    expect(adminClient.auth.admin.deleteUser).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000701");
+    expect(adminClient.auth.admin.deleteUser).not.toHaveBeenCalled();
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });
 });

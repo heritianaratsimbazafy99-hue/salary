@@ -4,6 +4,16 @@ export type InvitationCandidate = {
   employeeName: string;
 };
 
+export const EMPLOYEE_INVITATION_STATUS = {
+  ACCEPTED: "ACCEPTED",
+  EXPIRED: "EXPIRED",
+  PENDING: "PENDING",
+  REVOKED: "REVOKED",
+} as const;
+
+export type EmployeeInvitationStatus =
+  (typeof EMPLOYEE_INVITATION_STATUS)[keyof typeof EMPLOYEE_INVITATION_STATUS];
+
 export type ImportEmployeeCandidate = InvitationCandidate & {
   exists: boolean;
 };
