@@ -714,6 +714,33 @@ describe("POST /api/imports", () => {
     );
   });
 
+  it("marks imports as failed when the worksheet has too many columns", async () => {
+    const { db } = createAuthorizedImportClient();
+    const overlyWideRow = {
+      ...validPayrollRow,
+      ...Object.fromEntries(Array.from({ length: 130 }, (_, index) => [`extra_${index + 1}`, index + 1])),
+    };
+
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([overlyWideRow]));
+
+    const response = await POST(createImportRequest(formData));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        invalidRowCount: 0,
+        status: "FAILED",
+        validRowCount: 0,
+      },
+    });
+    expect(db.payroll_imports[0]).toMatchObject({
+      status: "FAILED",
+      valid_row_count: 0,
+    });
+    expect(db.payroll_import_rows).toHaveLength(0);
+  });
+
   it("marks imports as needing mapping when valid rows include unmapped unknown columns", async () => {
     const { db } = createAuthorizedImportClient();
     db.employees.push({

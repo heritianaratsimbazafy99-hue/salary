@@ -49,6 +49,8 @@ type EmployeeRecord = {
 
 class PayrollImportParseError extends Error {}
 
+const MAX_PAYROLL_WORKSHEET_COLUMNS = 128;
+
 export function buildImportSummary(input: ImportSummaryInput): ImportSummary {
   return {
     validRowCount: input.validRows.length,
@@ -264,6 +266,10 @@ function validateRowsMatchImportPeriod(
 function readHeaderRow(worksheet: ExcelJS.Worksheet): string[] {
   const headerRow = worksheet.getRow(1);
   const headers: string[] = [];
+
+  if (headerRow.cellCount > MAX_PAYROLL_WORKSHEET_COLUMNS) {
+    throw new PayrollImportParseError("Payroll worksheet exceeds the column limit.");
+  }
 
   for (let columnIndex = 1; columnIndex <= headerRow.cellCount; columnIndex += 1) {
     const header = normalizeExcelCellValue(headerRow.getCell(columnIndex).value);

@@ -2,10 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const importHardeningMigrationPath = "supabase/migrations/202606280001_security_findings_hardening.sql";
+const hardeningMigrationPaths = [
+  "supabase/migrations/202606280001_security_findings_hardening.sql",
+  "supabase/migrations/202606300001_close_rescan_findings.sql",
+];
 const rlsMigrationSql = [
   "supabase/migrations/202606260002_rls_policies.sql",
-  importHardeningMigrationPath,
+  ...hardeningMigrationPaths,
 ]
   .filter((path) => existsSync(path))
   .map((path) => readFileSync(path, "utf8").replace(/\s+/g, " ").toLowerCase())
@@ -180,6 +183,26 @@ describe("RLS policy model", () => {
     expect(rlsMigrationSql).toContain("drop policy if exists imports_insert_manager on public.payroll_imports;");
     expect(rlsMigrationSql).toContain("drop policy if exists import_rows_insert_manager on public.payroll_import_rows;");
     expect(rlsMigrationSql).toContain("drop policy if exists import_rows_update_manager on public.payroll_import_rows;");
+  });
+
+  it("revokes direct authenticated employee profile-binding mutations after server-side hardening", () => {
+    expect(rlsMigrationSql).toContain("revoke insert on table public.employees from authenticated;");
+    expect(rlsMigrationSql).toContain("drop policy if exists employees_insert_manager_or_admin on public.employees;");
+  });
+
+  it("revokes direct authenticated payslip publication mutations after server-side hardening", () => {
+    expect(rlsMigrationSql).toContain("revoke insert on table public.payslips from authenticated;");
+    expect(rlsMigrationSql).toContain("revoke insert on table public.payslip_versions from authenticated;");
+    expect(rlsMigrationSql).toContain("drop policy if exists payslips_insert_manager on public.payslips;");
+    expect(rlsMigrationSql).toContain(
+      "drop policy if exists payslip_versions_insert_manager on public.payslip_versions;",
+    );
+  });
+
+  it("clears unpublished payslip expiry metadata when closing direct preseed paths", () => {
+    expect(rlsMigrationSql).toContain(
+      "update public.payslips set expires_at = null where current_version_id is null;",
+    );
   });
 
   it("keeps RLS role helpers private security definer functions with scoped execute grants", () => {
