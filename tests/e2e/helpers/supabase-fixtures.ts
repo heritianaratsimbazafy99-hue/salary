@@ -154,6 +154,50 @@ export async function createPayrollWorkbook(
   return filePath;
 }
 
+export async function acceptEmployeeInvitationForE2E(
+  admin: SupabaseClient,
+  input: { agencyId: string; employeeEmail: string; fullName: string; password: string },
+) {
+  const employee = await createProfile(admin, {
+    email: input.employeeEmail,
+    fullName: input.fullName,
+    password: input.password,
+    role: "employee",
+  });
+  const { data: invitation, error: invitationError } = await admin
+    .from("employee_invitations")
+    .select("token_hash")
+    .eq("agency_id", input.agencyId)
+    .eq("email", input.employeeEmail)
+    .eq("status", "PENDING")
+    .single();
+  const tokenHash = invitation?.token_hash;
+
+  if (invitationError || typeof tokenHash !== "string") {
+    throw new Error(`Unable to find employee invitation: ${invitationError?.message ?? "missing token hash"}`);
+  }
+
+  const { data: acceptedInvitation, error: acceptError } = await admin.rpc("accept_employee_invitation", {
+    p_auth_user_id: employee.authUserId,
+    p_token_hash: tokenHash,
+  });
+  const accepted = Array.isArray(acceptedInvitation) ? acceptedInvitation[0] : acceptedInvitation;
+
+  if (
+    acceptError ||
+    !accepted ||
+    accepted.agency_id !== input.agencyId ||
+    accepted.status !== "ACCEPTED"
+  ) {
+    throw new Error(`Unable to accept employee invitation: ${acceptError?.message ?? "unexpected RPC response"}`);
+  }
+
+  return {
+    authUserId: employee.authUserId,
+    profileId: employee.id,
+  };
+}
+
 export async function signInAsE2EUser(
   page: Page,
   input: { email: string; expectedPath: RegExp; password: string; targetPath: string },

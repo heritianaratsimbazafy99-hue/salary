@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  acceptEmployeeInvitationForE2E,
   appUrl,
   createPayrollE2EFixture,
   createPayrollWorkbook,
-  enablePasswordLoginForE2E,
-  findEmployeeProfileByEmail,
   signInAsE2EUser,
 } from "./helpers/supabase-fixtures";
 
@@ -63,9 +62,10 @@ test("manager publishes a payroll import and employee/HR can see it", async ({ p
     expect(managerExport.status()).toBe(200);
     expect(await managerExport.text()).toContain(importId);
 
-    const employeeProfile = await findEmployeeProfileByEmail(fixture.admin, fixture.employeeEmail);
-    await enablePasswordLoginForE2E(fixture.admin, {
-      authUserId: employeeProfile.authUserId,
+    await acceptEmployeeInvitationForE2E(fixture.admin, {
+      agencyId: fixture.agencyId,
+      employeeEmail: fixture.employeeEmail,
+      fullName: "Rina Salary",
       password: fixture.password,
     });
 
