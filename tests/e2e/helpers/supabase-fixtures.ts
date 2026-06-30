@@ -297,6 +297,10 @@ async function cleanupPayrollFixture(
     "delete employee notifications",
     await admin.from("notifications").delete().eq("recipient_email", input.employeeEmail),
   );
+  await throwOnCleanupError(
+    "delete employee invitations",
+    await admin.from("employee_invitations").delete().eq("agency_id", input.agencyId),
+  );
 
   if (allProfileIds.length > 0) {
     await throwOnCleanupError("delete export jobs", await admin.from("export_jobs").delete().in("requested_by", allProfileIds));
