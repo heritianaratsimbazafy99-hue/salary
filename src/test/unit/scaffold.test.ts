@@ -35,7 +35,7 @@ describe("project scaffold", () => {
     const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
 
     expect(ciWorkflow).toContain("npm run verify:ci");
-    expect(ciWorkflow).toContain("supabase/setup-cli@v2");
+    expect(ciWorkflow).toContain("supabase/setup-cli@v3");
     expect(ciWorkflow).toContain("npm run test:e2e -- --project=chromium");
     expect(ciWorkflow).toContain("npm run db:advisors");
   });
