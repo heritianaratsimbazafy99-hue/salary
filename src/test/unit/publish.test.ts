@@ -156,23 +156,30 @@ function createTableQuery(db: PublishTestDb, table: keyof PublishTestDb) {
 
 function createDeleteQuery(rows: PublishTableRow[]) {
   const filters: Array<(row: PublishTableRow) => boolean> = [];
-
+  function removeMatchingRows() {
+    const removed = rows.filter((row) => filters.every((filter) => filter(row)));
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      if (removed.includes(rows[index])) rows.splice(index, 1);
+    }
+    return removed;
+  }
   const query = {
     eq(column: string, value: unknown) {
       filters.push((row) => row[column] === value);
       return query;
     },
+    is(column: string, value: unknown) {
+      filters.push((row) => row[column] === value);
+      return query;
+    },
+    select() {
+      return { maybeSingle: async () => ({ data: removeMatchingRows()[0] ?? null, error: null }) };
+    },
     then(resolve: (value: { data: null; error: null }) => unknown, reject?: (reason: unknown) => unknown) {
-      for (let index = rows.length - 1; index >= 0; index -= 1) {
-        if (filters.every((filter) => filter(rows[index]))) {
-          rows.splice(index, 1);
-        }
-      }
-
+      removeMatchingRows();
       return Promise.resolve({ data: null, error: null }).then(resolve, reject);
     },
   };
-
   return query;
 }
 
@@ -203,7 +210,7 @@ function createSelectQuery(rows: PublishTableRow[]) {
       filters.push((row) => values.includes(row[column]));
       return query;
     },
-    maybeSingle: async () => ({ data: filteredRows()[0] ?? null, error: null }),
+    maybeSingle: async () => ({ data: filteredRows()[0] ? { ...filteredRows()[0] } : null, error: null }),
     single: async () => {
       const row = filteredRows()[0];
       return {
@@ -234,6 +241,14 @@ function createUpdateQuery(rows: PublishTableRow[], payload: PublishTableRow) {
     is(column: string, value: unknown) {
       filters.push((row) => row[column] === value);
       return query;
+    },
+    select() {
+      const mutate = async () => {
+        const matched = rows.filter((row) => filters.every((filter) => filter(row)));
+        matched.forEach((row) => Object.assign(row, payload));
+        return { data: matched[0] ?? null, error: null };
+      };
+      return { single: mutate, maybeSingle: mutate };
     },
     then(resolve: (value: { data: null; error: null }) => unknown, reject?: (reason: unknown) => unknown) {
       rows.filter((row) => filters.every((filter) => filter(row))).forEach((row) => {
@@ -531,6 +546,7 @@ describe("POST /api/imports/:importId/publish", () => {
     );
     expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith({
       employeeName: "Employee One",
+      invitationToken: expect.any(String),
       to: "employee@example.com",
     });
     expect(db.notifications[0]).toMatchObject({
@@ -569,7 +585,7 @@ describe("POST /api/imports/:importId/publish", () => {
       },
     });
     expect(db.notifications[0]).toMatchObject({
-      failure_reason: "Resend unavailable",
+      failure_reason: "Invitation email delivery failed.",
       status: "FAILED",
     });
     expect(db.notifications[0].failed_at).toEqual(expect.any(String));
@@ -582,6 +598,108 @@ describe("POST /api/imports/:importId/publish", () => {
         }),
       }),
     );
+  });
+
+  it("keeps the ordinary payslip email for an already linked employee", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001",
+      employee_name: "Employee One", import_id: IMPORT_ID,
+    });
+    db.employees.push({
+      agency_id: AGENCY_ID, email: "employee@example.com", employee_id: "EMP-001",
+      full_name: "Employee One", is_active: true, profile_id: "existing-profile",
+    });
+    seedPublishedNotification(db);
+    adminMocks.createAdminClient.mockReturnValue(createAdminPublishClient(db));
+
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+    expect(response.status).toBe(200);
+    expect(db.employee_invitations).toHaveLength(0);
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith({
+      employeeName: "Employee One", to: "employee@example.com",
+    });
+  });
+
+  it("records a returned provider error as failure and never stores the invitation token", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001",
+      employee_name: "Employee One", import_id: IMPORT_ID,
+    });
+    seedPublishedNotification(db);
+    notificationMocks.sendPayslipPublishedEmail.mockImplementationOnce(async (input) => ({
+      data: null, error: { message: `Rejected https://example.com/auth/invitation?token=${input.invitationToken}` },
+    }));
+    adminMocks.createAdminClient.mockReturnValue(createAdminPublishClient(db));
+
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+    expect(response.status).toBe(200);
+    expect(db.notifications[0]).toMatchObject({ status: "FAILED", failure_reason: "Invitation email delivery failed." });
+    const token = notificationMocks.sendPayslipPublishedEmail.mock.calls[0][0].invitationToken;
+    expect(token).toEqual(expect.any(String));
+    expect(JSON.stringify(db)).not.toContain(token);
+    expect(JSON.stringify(await response.json())).not.toContain(token);
+    expect(JSON.stringify(auditMocks.recordAuditEvent.mock.calls)).not.toContain(token);
+  });
+
+  it.each([false, true])("restores an earlier invitation after failed publication unless it has since rotated: %s", async (concurrentRotation) => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001",
+      employee_name: "Employee One", import_id: IMPORT_ID,
+    });
+    const previousInvitation = {
+      id: "old-invitation", agency_id: AGENCY_ID, email: "employee@example.com",
+      employee_id: "EMP-001", full_name: "Employee One", invited_by: ACTOR_PROFILE_ID,
+      token_hash: "old-hash", expires_at: "2026-06-10T00:00:00.000Z",
+      updated_at: "2026-06-01T00:00:00.000Z", status: "PENDING",
+    };
+    db.employee_invitations.push({ ...previousInvitation });
+    const adminClient = createAdminPublishClient(db);
+    adminClient.rpc.mockImplementationOnce(async () => {
+      expect(db.employee_invitations[0].token_hash).not.toBe(previousInvitation.token_hash);
+      if (concurrentRotation) db.employee_invitations[0].token_hash = "concurrently-rotated";
+      return { data: null, error: { message: "transaction failed" } };
+    });
+    adminMocks.createAdminClient.mockReturnValue(adminClient);
+
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+    expect(response.status).toBe(500);
+    if (concurrentRotation) {
+      expect(db.employee_invitations[0].token_hash).toBe("concurrently-rotated");
+    } else {
+      expect(db.employee_invitations[0]).toEqual(previousInvitation);
+    }
+    expect(notificationMocks.sendPayslipPublishedEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not undo a concurrent activation when publication fails", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({
+      agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001",
+      employee_name: "Employee One", import_id: IMPORT_ID,
+    });
+    const adminClient = createAdminPublishClient(db);
+    adminClient.rpc.mockImplementationOnce(async () => {
+      db.employees[0].profile_id = "activated-profile";
+      db.employee_invitations[0].status = "ACCEPTED";
+      return { data: null, error: { message: "transaction failed" } };
+    });
+    adminMocks.createAdminClient.mockReturnValue(adminClient);
+
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+
+    expect(response.status).toBe(500);
+    expect(db.employees[0].profile_id).toBe("activated-profile");
+    expect(db.employee_invitations[0].status).toBe("ACCEPTED");
   });
 
   it("returns 500 and does not audit when the transactional publish RPC fails", async () => {
@@ -613,6 +731,7 @@ describe("POST /api/imports/:importId/publish", () => {
     expect(adminClient.auth.admin.createUser).not.toHaveBeenCalled();
     expect(db.profiles).not.toContainEqual(expect.objectContaining({ email: "employee@example.com" }));
     expect(db.employees).toHaveLength(0);
+    expect(db.employee_invitations).toHaveLength(0);
     expect(adminClient.auth.admin.deleteUser).not.toHaveBeenCalled();
     expect(auditMocks.recordAuditEvent).not.toHaveBeenCalled();
   });

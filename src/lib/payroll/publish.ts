@@ -131,7 +131,7 @@ export async function publishPayrollImport(input: {
   const result = parsePublishRpcRecord(data);
   const emailResult = await sendPayslipPublishedNotifications({
     agencyId: result.agencyId,
-    employeeIdentities,
+    provisionedEmployees,
     importId: input.importId,
     sendPayslipEmail: input.sendPayslipEmail ?? sendPayslipPublishedEmail,
     supabase: writeSupabase,
@@ -152,7 +152,7 @@ export async function publishPayrollImport(input: {
 
 async function sendPayslipPublishedNotifications(input: {
   agencyId: string;
-  employeeIdentities: Array<{ email: string; employeeId: string; fullName: string }>;
+  provisionedEmployees: ProvisionedEmployeeAuthProfile[];
   importId: string;
   sendPayslipEmail: typeof sendPayslipPublishedEmail;
   supabase: SupabasePublishClient;
@@ -161,20 +161,25 @@ async function sendPayslipPublishedNotifications(input: {
     agencyId: input.agencyId,
     importId: input.importId,
   });
-  const employeeNamesByEmail = new Map(
-    input.employeeIdentities.map((employee) => [employee.email.toLowerCase(), employee.fullName]),
+  const employeesByEmail = new Map(
+    input.provisionedEmployees.map((employee) => [employee.email.toLowerCase(), employee]),
   );
   let sent = 0;
   let failed = 0;
 
   for (const notification of notifications) {
-    const employeeName = employeeNamesByEmail.get(notification.recipientEmail) ?? "Salarie";
+    const employee = employeesByEmail.get(notification.recipientEmail.toLowerCase());
+    const employeeName = employee?.fullName ?? "Salarie";
 
     try {
       const response = await input.sendPayslipEmail({
         employeeName,
+        ...(employee?.invitationToken ? { invitationToken: employee.invitationToken } : {}),
         to: notification.recipientEmail,
       });
+      if (response && typeof response === "object" && "error" in response && response.error) {
+        throw new Error("Le fournisseur email a refusé l'envoi.");
+      }
       const providerMessageId = parseProviderMessageId(response);
 
       await markNotificationSent(input.supabase, {
@@ -184,7 +189,7 @@ async function sendPayslipPublishedNotifications(input: {
       sent += 1;
     } catch (error) {
       await markNotificationFailed(input.supabase, {
-        failureReason: safeFailureReason(error),
+        failureReason: employee?.invitationToken ? "Invitation email delivery failed." : safeFailureReason(error),
         notificationId: notification.id,
       });
       failed += 1;

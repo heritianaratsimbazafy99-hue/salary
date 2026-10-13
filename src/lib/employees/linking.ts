@@ -30,6 +30,12 @@ export type ProvisionedEmployeeAuthProfile = {
   };
   fullName: string;
   invitationId?: string;
+  // Server memory only: never serialize this provisioning object in an API response.
+  invitationToken?: string;
+  invitationRollback?: {
+    tokenHash: string;
+    previousInvitation: ExistingInvitationRecord | null;
+  };
   profileId: string | null;
 };
 
@@ -65,6 +71,13 @@ type ExistingEmployeeRecord = {
 
 type ExistingInvitationRecord = {
   id: string;
+  email: string;
+  employee_id: string;
+  full_name: string;
+  invited_by: string;
+  token_hash: string;
+  expires_at: string;
+  updated_at: string;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -193,7 +206,7 @@ export async function ensureEmployeeAuthProfile(
     profileId,
   });
 
-  let invitation: { invitationId?: string; token?: string } | null = null;
+  let invitation: Awaited<ReturnType<typeof upsertPendingEmployeeInvitation>> | null = null;
 
   if (!profileId) {
     try {
@@ -221,6 +234,8 @@ export async function ensureEmployeeAuthProfile(
     employeeId: identity.employeeId,
     fullName: identity.fullName,
     invitationId: invitation?.invitationId,
+    invitationToken: invitation?.token,
+    invitationRollback: invitation?.rollback,
     profileId,
   };
 }
@@ -231,35 +246,53 @@ export async function rollbackEmployeeAuthProfileProvisioning(
 ) {
   const rollback = provisioned.employeeRollback;
 
-  if (rollback.previousEmployee) {
-    await admin
-      .from("employees")
-      .update({
+  if (provisioned.invitationId && provisioned.invitationRollback) {
+    const previousInvitation = provisioned.invitationRollback.previousInvitation;
+    // Restore only this attempt: never overwrite an accepted or newer invitation.
+    // New invitations have not been sent yet; deleting them also avoids collisions
+    // with an older REVOKED row under the invitation status uniqueness constraint.
+    const invitationMutation = previousInvitation
+      ? admin.from("employee_invitations").update({
+          email: previousInvitation.email,
+          employee_id: previousInvitation.employee_id,
+          full_name: previousInvitation.full_name,
+          invited_by: previousInvitation.invited_by,
+          token_hash: previousInvitation.token_hash,
+          expires_at: previousInvitation.expires_at,
+          updated_at: previousInvitation.updated_at,
+        })
+      : admin.from("employee_invitations").delete();
+    const { data, error } = await invitationMutation
+      .eq("id", provisioned.invitationId)
+      .eq("status", "PENDING")
+      .eq("token_hash", provisioned.invitationRollback.tokenHash)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !data) return;
+  }
+
+  const employeeMutation = rollback.previousEmployee
+    ? admin.from("employees").update({
         email: rollback.previousEmployee.email,
         employee_id: rollback.previousEmployee.employeeId,
         full_name: rollback.previousEmployee.fullName,
         is_active: rollback.previousEmployee.isActive,
         profile_id: rollback.previousEmployee.profileId,
       })
-      .eq("agency_id", rollback.identity.agencyId)
-      .eq("employee_id", rollback.identity.employeeId);
-  } else {
-    await admin
-      .from("employees")
-      .delete()
-      .eq("agency_id", rollback.identity.agencyId)
-      .eq("employee_id", rollback.identity.employeeId);
-  }
+    : admin.from("employees").delete();
+  const guardedMutation = employeeMutation
+    .eq("agency_id", rollback.identity.agencyId)
+    .eq("employee_id", rollback.identity.employeeId)
+    .eq("email", rollback.identity.email)
+    .eq("full_name", rollback.identity.fullName);
 
-  if (provisioned.invitationId) {
-    await admin
-      .from("employee_invitations")
-      .update({
-        status: "REVOKED",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", provisioned.invitationId)
-      .eq("status", "PENDING");
+  // An activation can finish between provisioning and a failed publication.
+  // Never detach or delete the account linked by that activation.
+  if (provisioned.profileId) {
+    await guardedMutation.eq("profile_id", provisioned.profileId);
+  } else {
+    await guardedMutation.is("profile_id", null);
   }
 }
 
@@ -336,15 +369,23 @@ async function upsertPublicationEmployee(
   }
 }
 
-async function upsertPendingEmployeeInvitation(
+export class InvitationCooldownError extends Error {}
+
+export async function upsertPendingEmployeeInvitation(
   admin: EmployeeProvisioningAdminClient,
-  input: { identity: EmployeeIdentity; invitedBy: string },
+  input: { identity: EmployeeIdentity; invitedBy: string; cooldownMs?: number },
 ) {
   if (!UUID_PATTERN.test(input.invitedBy)) {
     throw new Error("Impossible de creer l'invitation salarie.");
   }
 
   const existingInvitation = await findPendingEmployeeInvitation(admin, input.identity);
+  if (existingInvitation && input.cooldownMs) {
+    const lastUpdated = Date.parse(existingInvitation.updated_at);
+    if (!Number.isFinite(lastUpdated) || Date.now() - lastUpdated < input.cooldownMs) {
+      throw new InvitationCooldownError("Invitation récemment envoyée.");
+    }
+  }
   const token = randomUUID() + randomUUID();
   const tokenHash = await sha256Hex(token);
   const expiresAt = new Date(Date.now() + INVITATION_TTL_MS).toISOString();
@@ -358,21 +399,28 @@ async function upsertPendingEmployeeInvitation(
         employee_id: input.identity.employeeId,
         full_name: input.identity.fullName,
         invited_by: input.invitedBy,
+        token_hash: tokenHash,
         expires_at: expiresAt,
         updated_at: updatedAt,
       })
       .eq("id", existingInvitation.id)
       .eq("status", "PENDING")
+      .eq("token_hash", existingInvitation.token_hash)
+      .eq("updated_at", existingInvitation.updated_at)
       .select("id")
       .single();
 
+    if (input.cooldownMs && error?.code === "PGRST116") {
+      throw new InvitationCooldownError("Invitation modifiée par une autre demande.");
+    }
     if (error || data?.id !== existingInvitation.id) {
       throw new Error("Impossible de creer l'invitation salarie.");
     }
 
     return {
-      invitationId: undefined,
-      token: undefined,
+      invitationId: existingInvitation.id,
+      token,
+      rollback: { tokenHash, previousInvitation: existingInvitation },
     };
   }
 
@@ -400,8 +448,9 @@ async function upsertPendingEmployeeInvitation(
   }
 
   return {
-    invitationId: existingInvitation ? undefined : data.id,
+    invitationId: data.id as string,
     token,
+    rollback: { tokenHash, previousInvitation: null },
   };
 }
 
@@ -411,7 +460,7 @@ async function findPendingEmployeeInvitation(
 ): Promise<ExistingInvitationRecord | null> {
   const { data, error } = await admin
     .from("employee_invitations")
-    .select("id")
+    .select("id,email,employee_id,full_name,invited_by,token_hash,expires_at,updated_at")
     .eq("agency_id", identity.agencyId)
     .eq("employee_id", identity.employeeId)
     .eq("status", "PENDING")
@@ -425,13 +474,14 @@ async function findPendingEmployeeInvitation(
     return null;
   }
 
-  if (typeof data.id !== "string") {
+  const requiredFields = [
+    "id", "email", "employee_id", "full_name", "invited_by", "token_hash", "expires_at", "updated_at",
+  ] as const;
+  if (requiredFields.some((field) => typeof data[field] !== "string")) {
     throw new Error("Invitation salarie invalide.");
   }
 
-  return {
-    id: data.id,
-  };
+  return data as ExistingInvitationRecord;
 }
 
 async function sha256Hex(value: string) {
