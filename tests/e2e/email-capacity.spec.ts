@@ -1,0 +1,52 @@
+import { expect, test } from "@playwright/test";
+import { acceptEmployeeInvitationForE2E, appUrl, createPayrollE2EFixture, createPayrollWorkbook, signInAsE2EUser } from "./helpers/supabase-fixtures";
+
+test("manager recovers failed email for an activated employee without resending confirmed or uncertain deliveries", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const fixture = await createPayrollE2EFixture();
+  try {
+    const workbook = await createPayrollWorkbook(testInfo, { employeeEmail: fixture.employeeEmail, periodStart: fixture.periodStart, periodEnd: fixture.periodEnd, suffix: fixture.suffix });
+    await signInAsE2EUser(page, { email: fixture.manager.email, password: fixture.password, expectedPath: /\/manager\/imports$/, targetPath: "/manager/imports" });
+    await page.getByLabel("Debut de periode").fill(fixture.periodStart);
+    await page.getByLabel("Fin de periode").fill(fixture.periodEnd);
+    await page.getByLabel("Fichier Excel").setInputFiles(workbook);
+    await page.getByRole("button", { name: "Importer", exact: true }).click();
+    await page.waitForURL(/\/manager\/imports\/[0-9a-f-]+$/);
+    const importId = new URL(page.url()).pathname.split("/").at(-1)!;
+    await page.getByLabel("Categorie").selectOption("BENEFIT");
+    await page.getByRole("button", { name: "Enregistrer les mappings" }).click();
+    await expect(page.getByRole("heading", { name: "Mapping des colonnes" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Publier", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Vérifier avant publication" });
+    await dialog.getByRole("checkbox").check();
+    const publication = page.waitForResponse((response) => response.url().endsWith("/publish") && response.request().method() === "POST");
+    await dialog.getByRole("button", { name: "Confirmer la publication", exact: true }).click();
+    expect((await publication).status()).toBe(200);
+    await expect(page.getByRole("button", { name: "Réessayer les emails en échec", exact: true })).toBeVisible();
+    await acceptEmployeeInvitationForE2E(fixture.admin, { agencyId: fixture.agencyId, employeeEmail: fixture.employeeEmail, fullName: "Employee One", password: fixture.password });
+    const employee = await fixture.admin.from("employees").select("id,employee_id").eq("agency_id", fixture.agencyId).single();
+    expect(employee.error).toBeNull();
+    expect(employee.data!.id).not.toBe(employee.data!.employee_id);
+    const notification = await fixture.admin.from("notifications").select("id").eq("recipient_email", fixture.employeeEmail).single();
+    expect(notification.error).toBeNull();
+    const fail = await fixture.admin.from("notifications").update({ status: "FAILED", sent_at: null, failed_at: new Date().toISOString(), failure_reason: "Email delivery failed." }).eq("id", notification.data!.id);
+    expect(fail.error).toBeNull();
+    const messages = async () => (await (await page.request.get(`http://127.0.0.1:55428/messages?to=${encodeURIComponent(fixture.employeeEmail)}`)).json()) as Array<{ id: string }>;
+    const before = (await messages()).length;
+    await page.getByRole("button", { name: "Réessayer les emails en échec", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "1 email(s) envoyé(s)" })).toBeVisible();
+    expect((await messages()).length).toBe(before + 1);
+    const after = await fixture.admin.from("notifications").select("status,provider_message_id").eq("id", notification.data!.id).single();
+    expect(after.data).toMatchObject({ status: "SENT", provider_message_id: expect.any(String) });
+    const endpoint = appUrl(`/api/imports/${importId}/notifications`);
+    const repeated = await page.request.post(endpoint);
+    expect(repeated.status()).toBe(200); expect((await repeated.json()).data.sent).toBe(0);
+    expect((await messages()).length).toBe(before + 1);
+    expect((await page.request.post(endpoint, { headers: { origin: "https://foreign.example.com" } })).status()).toBe(403);
+    const unknown = await fixture.admin.from("notifications").update({ status: "FAILED", sent_at: null, failed_at: new Date().toISOString(), failure_reason: "EMAIL_DELIVERY_UNCONFIRMED" }).eq("id", notification.data!.id);
+    expect(unknown.error).toBeNull();
+    const uncertain = await page.request.post(endpoint);
+    expect((await uncertain.json()).data).toMatchObject({ sent: 0, unconfirmed: 1 });
+    expect((await messages()).length).toBe(before + 1);
+  } finally { await fixture.cleanup(); }
+});

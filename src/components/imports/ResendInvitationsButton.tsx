@@ -21,9 +21,9 @@ export function ResendInvitationsButton({ importId }: { importId: string }) {
       const response = await fetch(`/api/imports/${importId}/invitations`, { method: "POST" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message ?? "Renvoi impossible.");
-      const { sent, failed, skipped } = payload.data;
-      setHasError(failed > 0);
-      setMessage(`${sent} invitation(s) envoyée(s), ${failed} échec(s), ${skipped} non renvoyée(s) : compte déjà activé, inactif ou invitation envoyée il y a moins d’une minute. Vous pouvez réessayer après une minute.`);
+      const { sent, failed, skipped, unconfirmed = 0 } = payload.data;
+      setHasError(failed > 0 || unconfirmed > 0);
+      setMessage(`${sent} invitation(s) envoyée(s), ${failed} échec(s), ${skipped} non renvoyée(s) : compte déjà activé, inactif ou invitation envoyée il y a moins d’une minute. Vous pouvez réessayer après une minute.${unconfirmed ? ` ${unconfirmed} envoi(s) incertain(s) : les nouveaux liens restent valides. Contactez le support pour vérifier leur livraison avant tout renvoi.` : ""}`);
     } catch (error) {
       setHasError(true);
       setMessage(error instanceof Error ? error.message : "Renvoi impossible. Réessayez.");

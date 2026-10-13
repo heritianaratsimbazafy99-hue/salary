@@ -8,7 +8,12 @@ vi.mock("@/lib/env.public", () => ({ publicEnv: { NEXT_PUBLIC_APP_URL: "https://
 vi.mock("@/lib/admin/auth", () => ({ getCurrentAgencyScopedActor: mocks.actor }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.read }));
-vi.mock("@/lib/notifications/resend-server", () => ({ sendPayslipPublishedEmail: mocks.send }));
+vi.mock("@/lib/notifications/resend-server", () => ({ EMAIL_DELIVERY_UNCONFIRMED: "EMAIL_DELIVERY_UNCONFIRMED", sendPayslipPublishedEmail: mocks.send,
+  sendPayslipPublishedEmails: async (inputs: unknown[]) => Promise.all(inputs.map(async (input) => {
+    try { return await mocks.send(input); }
+    catch { return { data: null, error: { message: "Email delivery failed." } }; }
+  })),
+}));
 vi.mock("@/lib/audit/server", () => ({ recordAuditEvent: mocks.audit }));
 
 import { POST } from "@/app/api/imports/[importId]/invitations/route";
@@ -19,7 +24,7 @@ const ACTOR = "00000000-0000-0000-0000-000000000003";
 type Row = Record<string, unknown>;
 type Db = Record<string, Row[]>;
 
-function database() {
+function database(options: { onEmployeeRead?: (employee: Row | undefined) => Promise<void>; failRollback?: boolean } = {}) {
   const db: Db = {
     agencies: [{ id: AGENCY, is_active: true }],
     payroll_imports: [{ id: IMPORT, agency_id: AGENCY, status: "PUBLISHED" }],
@@ -53,8 +58,15 @@ function database() {
       update: vi.fn((value: Row) => { update = value; return query; }),
       upsert: vi.fn((value: Row) => { upsert = value; return query; }),
       single: vi.fn(async () => { const rows = run(); return { data: rows[0] ?? null, error: rows.length ? null : { code: "PGRST116" } }; }),
-      maybeSingle: vi.fn(async () => ({ data: run()[0] ?? null, error: null })),
-      then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: run(), error: null }).then(resolve),
+      maybeSingle: vi.fn(async () => {
+        const row = run()[0];
+        if (table === "employees") await options.onEmployeeRead?.(row);
+        return { data: row ?? null, error: null };
+      }),
+      then: (resolve: (value: unknown) => unknown) => {
+        if (options.failRollback && update?.token_hash === "old-hash") return Promise.resolve({ data: null, error: { message: "DB write failed" } }).then(resolve);
+        return Promise.resolve({ data: run(), error: null }).then(resolve);
+      },
     };
     return query;
   }) };
@@ -84,7 +96,7 @@ describe("POST import invitation resend", () => {
     const employeeBefore = { ...db.employees[0] };
     const response = await request();
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ data: { sent: 1, failed: 0, skipped: 0 } });
+    await expect(response.json()).resolves.toEqual({ data: { sent: 1, failed: 0, skipped: 0, unconfirmed: 0 } });
     const email = mocks.send.mock.calls[0][0];
     expect(email).toMatchObject({ to: "current@example.com", employeeName: "Current Worker" });
     expect(db.employee_invitations[0].token_hash).toBe(createHash("sha256").update(email.invitationToken).digest("hex"));
@@ -97,11 +109,11 @@ describe("POST import invitation resend", () => {
   it("durably throttles repeated sends, including invitations created at initial publication", async () => {
     const { db } = database();
     db.employee_invitations[0].updated_at = new Date().toISOString();
-    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1 } });
+    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1, unconfirmed: 0 } });
     expect(mocks.send).not.toHaveBeenCalled();
     db.employee_invitations[0].updated_at = "2020-01-01T00:00:00.000Z";
     await request();
-    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1 } });
+    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1, unconfirmed: 0 } });
     expect(mocks.send).toHaveBeenCalledOnce();
   });
 
@@ -120,7 +132,7 @@ describe("POST import invitation resend", () => {
     if (condition === "linked") db.employees[0].profile_id = "profile";
     if (condition === "inactive") db.employees[0].is_active = false;
     if (condition === "accepted") db.employee_invitations[0].status = "ACCEPTED";
-    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1 } });
+    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1, unconfirmed: 0 } });
     expect(mocks.send).not.toHaveBeenCalled();
   });
 
@@ -157,11 +169,52 @@ describe("POST import invitation resend", () => {
     db.employee_invitations[0].email = "current@example.com";
     mocks.send.mockImplementationOnce(async ({ invitationToken }) => { throw new Error(`token=${invitationToken}`); });
     const response = await request();
-    await expect(response.json()).resolves.toEqual({ data: { sent: 0, failed: 1, skipped: 0 } });
+    await expect(response.json()).resolves.toEqual({ data: { sent: 0, failed: 1, skipped: 0, unconfirmed: 0 } });
     const token = mocks.send.mock.calls[0][0].invitationToken;
     expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain(token);
     expect(db.employee_invitations[0].token_hash).toBe("old-hash");
     expect(Date.parse(db.employee_invitations[0].updated_at as string)).toBeGreaterThan(Date.now() - 10_000);
-    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1 } });
+    await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 1, unconfirmed: 0 } });
   });
+});
+
+it("preserves the newest invitation token when delivery is uncertain", async () => {
+  const { db } = database();
+  db.employee_invitations[0].email = "current@example.com";
+  mocks.send.mockResolvedValueOnce({ data: null, error: { message: "Unknown delivery", code: "EMAIL_DELIVERY_UNCONFIRMED" } });
+  await expect((await request()).json()).resolves.toEqual({ data: { sent: 0, failed: 0, skipped: 0, unconfirmed: 1 } });
+  const newToken = mocks.send.mock.calls[0][0].invitationToken;
+  expect(db.employee_invitations[0].token_hash).toBe(createHash("sha256").update(newToken).digest("hex"));
+  expect(db.employee_invitations[0].token_hash).not.toBe("old-hash");
+});
+
+
+it("prepares 340 resend recipients in order with at most eight concurrent operations and exact mixed counts", async () => {
+  let active = 0;
+  let peak = 0;
+  const { db } = database({ onEmployeeRead: async (employee) => {
+    active++; peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, Number(employee?.employee_id === "EMP-0" ? 8 : 1)));
+    active--;
+    if (employee?.employee_id === "EMP-17") throw new Error("Read unavailable");
+  } });
+  db.payroll_import_rows = Array.from({ length: 340 }, (_, index) => ({ id: `row-${index}`, agency_id: AGENCY, import_id: IMPORT, employee_id: `EMP-${index}` }));
+  db.employees = Array.from({ length: 340 }, (_, index) => ({ agency_id: AGENCY, employee_id: `EMP-${index}`, email: `worker${index}@example.com`, full_name: `Worker ${index}`, is_active: index !== 23, profile_id: null }));
+  db.employee_invitations = Array.from({ length: 340 }, (_, index) => ({ id: `invitation-${index}`, agency_id: AGENCY, employee_id: `EMP-${index}`, email: `worker${index}@example.com`, full_name: `Worker ${index}`, invited_by: ACTOR, token_hash: `old-${index}`, status: index === 24 ? "ACCEPTED" : "PENDING", expires_at: "2020-01-01T00:00:00.000Z", updated_at: "2020-01-01T00:00:00.000Z" }));
+  const response = await request();
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ data: { sent: 337, failed: 1, skipped: 2, unconfirmed: 0 } });
+  expect(peak).toBe(8); expect(active).toBe(0);
+  expect(mocks.send.mock.calls.map((call) => call[0].to)).toEqual(Array.from({ length: 340 }, (_, index) => index).filter((index) => ![17, 23, 24].includes(index)).map((index) => `worker${index}@example.com`));
+});
+
+it("reports and audits a structured rollback persistence error instead of silently claiming restoration", async () => {
+  const { db } = database({ failRollback: true });
+  db.employee_invitations[0].email = "current@example.com";
+  mocks.send.mockResolvedValueOnce({ data: null, error: { message: "Rejected" } });
+  const response = await request();
+  expect(response.status).toBe(503);
+  expect((await response.json()).error.message).toContain("Contactez le support");
+  expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ rollbackFailed: 1, failed: 1 }) }));
+  expect(db.employee_invitations[0].token_hash).not.toBe("old-hash");
 });

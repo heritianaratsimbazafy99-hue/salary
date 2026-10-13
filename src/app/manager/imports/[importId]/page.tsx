@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ColumnMappingForm } from "@/components/imports/ColumnMappingForm";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { PayslipPreviewTable } from "@/components/imports/PayslipPreviewTable";
+import { RetryNotificationsButton } from "@/components/imports/RetryNotificationsButton";
 import { ResendInvitationsButton } from "@/components/imports/ResendInvitationsButton";
 import { PublishImportButton } from "@/components/imports/PublishImportButton";
 import { UploadStepper } from "@/components/imports/UploadStepper";
@@ -129,7 +130,7 @@ export default async function ImportDetailPage({ params }: PageProps) {
             payrollImport.status === "READY_FOR_PREVIEW" ? (
               <PublishImportButton importId={payrollImport.id} />
             ) : ["PUBLISHED", "SUPERSEDED"].includes(payrollImport.status) ? (
-              <ResendInvitationsButton importId={payrollImport.id} />
+              <div className="grid gap-4"><ResendInvitationsButton importId={payrollImport.id} /><RetryNotificationsButton importId={payrollImport.id} /></div>
             ) : undefined
           }
         />

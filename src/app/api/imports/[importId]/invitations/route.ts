@@ -8,6 +8,8 @@ import { apiError } from "@/lib/errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest, context: { params: Promise<{ importId: string }> }) {
   try {
     const origin = request.headers.get("origin");
@@ -25,9 +27,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ im
     await recordAuditEvent({
       action: "EMPLOYEE_INVITATIONS_RESENT", actorProfileId: actor.id, actorRole: actor.role,
       agencyId: result.agencyId, resourceId: importId, resourceType: "payroll_import",
-      metadata: { sent: result.sent, failed: result.failed, skipped: result.skipped },
+      metadata: { sent: result.sent, failed: result.failed, skipped: result.skipped, unconfirmed: result.unconfirmed, rollbackFailed: result.rollbackFailed },
     });
-    return NextResponse.json({ data: { sent: result.sent, failed: result.failed, skipped: result.skipped } });
+    if (result.rollbackFailed > 0) {
+      return NextResponse.json(apiError("INTERNAL_ERROR", "Certains anciens liens n’ont pas pu être restaurés après un échec d’envoi. Contactez le support avant de renvoyer les invitations."), { status: 503 });
+    }
+    return NextResponse.json({ data: { sent: result.sent, failed: result.failed, skipped: result.skipped, unconfirmed: result.unconfirmed } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === AUTH_REQUIRED_ERROR_MESSAGE) return NextResponse.json(apiError("UNAUTHORIZED", "Authentification requise."), { status: 401 });

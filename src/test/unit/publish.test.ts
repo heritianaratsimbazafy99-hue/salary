@@ -42,7 +42,12 @@ vi.mock("@/lib/audit/server", () => ({
 }));
 
 vi.mock("@/lib/notifications/resend-server", () => ({
+  EMAIL_DELIVERY_UNCONFIRMED: "EMAIL_DELIVERY_UNCONFIRMED",
   sendPayslipPublishedEmail: notificationMocks.sendPayslipPublishedEmail,
+  sendPayslipPublishedEmails: async (inputs: unknown[]) => Promise.all(inputs.map(async (input) => {
+    try { return await notificationMocks.sendPayslipPublishedEmail(input); }
+    catch { return { data: null, error: { message: "Email delivery failed." } }; }
+  })),
 }));
 
 type PublishTableRow = Record<string, unknown>;
@@ -510,6 +515,9 @@ describe("POST /api/imports/:importId/publish", () => {
         importId: IMPORT_ID,
         publishedCount: 1,
         status: "PUBLISHED",
+        emailSentCount: 1,
+        emailFailedCount: 0,
+        notificationCount: 1,
       },
     });
     expect(adminClient.rpc).toHaveBeenCalledWith("publish_payroll_import_reviewed", {
@@ -549,11 +557,12 @@ describe("POST /api/imports/:importId/publish", () => {
         }),
       }),
     );
-    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith({
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith(expect.objectContaining({
       employeeName: "Employee One",
       invitationToken: expect.any(String),
       to: "employee@example.com",
-    });
+      idempotencyKey: expect.stringContaining("notification/"),
+    }));
     expect(db.notifications[0]).toMatchObject({
       failed_at: null,
       failure_reason: null,
@@ -651,6 +660,9 @@ describe("POST /api/imports/:importId/publish", () => {
         importId: IMPORT_ID,
         publishedCount: 1,
         status: "PUBLISHED",
+        emailSentCount: 0,
+        emailFailedCount: 1,
+        notificationCount: 1,
       },
     });
     expect(db.notifications[0]).toMatchObject({
@@ -687,9 +699,9 @@ describe("POST /api/imports/:importId/publish", () => {
 
     expect(response.status).toBe(200);
     expect(db.employee_invitations).toHaveLength(0);
-    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith({
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith(expect.objectContaining({
       employeeName: "Employee One", to: "employee@example.com",
-    });
+    }));
   });
 
   it("records a returned provider error as failure and never stores the invitation token", async () => {

@@ -17,7 +17,8 @@
     "db:advisors": "supabase db advisors --local --type all --level warn --fail-on error",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "verify:ci": "npm run check:secrets && npm run verify && npm audit --audit-level=high",
-    "verify:full": "npm run check:secrets && npm run verify && npm run test:e2e && npm run db:advisors && npm audit --audit-level=high"
+    "verify:full": "npm run check:secrets && npm run verify && npm run test:e2e && npm run db:advisors && npm audit --audit-level=high",
+    "test:capacity": "node scripts/load/capacity-local.mjs --local-only"
   },
   "dependencies": {
     "@sentry/nextjs": "10.62.0",
