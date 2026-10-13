@@ -56,10 +56,15 @@ test("new employee activates from delivered invitation, reads payslip and signs 
     await page.getByLabel("Categorie").selectOption("BENEFIT");
     await page.getByRole("button", { name: "Enregistrer les mappings" }).click();
     await expect(page.getByRole("heading", { name: "Mapping des colonnes" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Publier", exact: true }).click();
+    const publicationReview = page.getByRole("dialog", { name: "Vérifier avant publication" });
+    await expect(publicationReview.getByText(fixture.employeeEmail, { exact: true })).toBeVisible();
+    await expect(publicationReview.getByRole("button", { name: "Confirmer la publication", exact: true })).toBeDisabled();
+    await publicationReview.getByRole("checkbox", { name: "Je confirme les destinataires et la publication de toutes les fiches valides." }).check();
     const publicationResponse = page.waitForResponse((response) =>
       response.url().endsWith("/publish") && response.request().method() === "POST",
     { timeout: 15_000 });
-    await page.getByRole("button", { name: "Publier", exact: true }).click();
+    await publicationReview.getByRole("button", { name: "Confirmer la publication", exact: true }).click();
     expect((await publicationResponse).status()).toBe(200);
     await expect(page.locator('[aria-current="step"]').filter({ hasText: "Publication" })).toBeVisible({ timeout: 15_000 });
 
@@ -106,7 +111,7 @@ test("new employee activates from delivered invitation, reads payslip and signs 
         targetPath: importPath,
       });
       await managerPage.getByRole("button", { name: "Renvoyer les invitations" }).click();
-      await expect(managerPage.getByRole("status")).toContainText("1 invitation(s) envoyée(s), 0 échec(s)");
+      await expect(managerPage.getByRole("status").filter({ hasText: "invitation(s)" })).toContainText("1 invitation(s) envoyée(s), 0 échec(s)");
     } finally {
       await managerBrowser.close();
     }

@@ -142,6 +142,7 @@ function createSelectQuery(rows: ImportTableRow[]) {
       return query;
     },
     in(column: string, values: unknown[]) {
+      if (encodeURIComponent(JSON.stringify(values)).length > 4500) throw new Error("414 URI Too Long");
       filters.push((row) => values.includes(row[column]));
       return query;
     },
@@ -336,13 +337,13 @@ describe("POST /api/imports", () => {
     });
   });
 
-  it("returns 422 when an authenticated request uploads a file larger than 10 MB", async () => {
+  it("returns 422 when an authenticated request uploads a file larger than 4 MiB", async () => {
     createAuthorizedImportClient();
 
     const formData = new FormData();
     appendRequiredImportFields(
       formData,
-      new File([new Uint8Array(10 * 1024 * 1024 + 1)], "payroll.xlsx"),
+      new File([new Uint8Array(4 * 1024 * 1024 + 1)], "payroll.xlsx"),
     );
 
     const response = await POST(createImportRequest(formData));
@@ -379,7 +380,7 @@ describe("POST /api/imports", () => {
 
     const request = createImportRequest(
       new FormData(),
-      new Headers({ "content-length": String(10 * 1024 * 1024 + 64 * 1024 + 1) }),
+      new Headers({ "content-length": String(4 * 1024 * 1024 + 64 * 1024 + 1) }),
     );
 
     const response = await POST(request);
@@ -676,6 +677,31 @@ describe("POST /api/imports", () => {
         }),
       ]),
     );
+  });
+
+  it("reports an oversized employee ID as an invalid row without issuing a huge lookup", async () => {
+    const { db } = createAuthorizedImportClient();
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile([{ ...validPayrollRow, employee_id: "X".repeat(5000) }]));
+    const response = await POST(createImportRequest(formData));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: { validRowCount: 0, invalidRowCount: 1, status: "FAILED" } });
+    expect(db.payroll_import_rows).toHaveLength(0);
+    expect(db.payroll_import_errors).toEqual(expect.arrayContaining([expect.objectContaining({ field_name: "employeeId" })]));
+  });
+
+  it("imports 2000 rows and finds every existing employee using bounded queries", async () => {
+    const { db } = createAuthorizedImportClient();
+    const rows = Array.from({ length: 2000 }, (_, index) => ({
+      ...validPayrollRow, email: `employee-${index}@example.com`, employee_id: `EMP-${String(index).padStart(4, "0")}`,
+    }));
+    db.employees.push(...rows.map((row) => ({ agency_id: AGENCY_ID, employee_id: row.employee_id })));
+    const formData = new FormData();
+    appendRequiredImportFields(formData, await createPayrollFile(rows));
+    const response = await POST(createImportRequest(formData));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: { validRowCount: 2000, unknownEmployeeCount: 0, status: "READY_FOR_PREVIEW" } });
+    expect(db.payroll_import_rows).toHaveLength(2000);
   });
 
   it("marks imports as failed when the worksheet exceeds 2000 useful payroll rows", async () => {

@@ -20,8 +20,13 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
     let shouldReactivate = true;
 
     try {
+      const formData = new FormData(form);
+      const file = formData.get("file");
+      if (file instanceof File && file.size > 4 * 1024 * 1024) {
+        setHasError(true); setMessage("Le fichier dépasse la limite de 4 Mo."); return;
+      }
       const response = await fetch("/api/imports", {
-        body: new FormData(form),
+        body: formData,
         method: "POST",
       });
       const payload = (await response.json().catch(() => null)) as
@@ -66,7 +71,7 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
       <Input
         accept=".xlsx"
         className="pt-2"
-        label="Fichier Excel"
+        label="Fichier Excel (4 Mo maximum)"
         name="file"
         required
         type="file"

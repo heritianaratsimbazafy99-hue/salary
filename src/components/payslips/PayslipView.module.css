@@ -1,0 +1,32 @@
+@media print {
+  .document {
+    animation: none;
+    overflow: visible;
+    border: 1px solid #999;
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 11pt;
+    color: black;
+  }
+
+  .document * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .document svg, .document [aria-hidden="true"] {
+    display: none !important;
+  }
+
+  .document header, .document dl, .document li {
+    break-inside: avoid;
+  }
+
+  .document li {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #ddd;
+  }
+}

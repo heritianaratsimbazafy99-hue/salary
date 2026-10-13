@@ -44,6 +44,7 @@ type ExportTestDb = {
   payroll_analytics_rows: ExportTableRow[];
   payroll_imports: ExportTableRow[];
   profiles: ExportTableRow[];
+  payslips: ExportTableRow[];
 };
 
 function createExportDb(): ExportTestDb {
@@ -53,6 +54,7 @@ function createExportDb(): ExportTestDb {
     payroll_analytics_rows: [],
     payroll_imports: [],
     profiles: [],
+    payslips: [],
   };
 }
 
@@ -101,17 +103,12 @@ function createTableQuery(rows: ExportTableRow[]) {
     select() {
       return query;
     },
-    order(column: string, options: { ascending: boolean }) {
-      const sortedRows = [...filteredRows()].sort((left: ExportTableRow, right: ExportTableRow) => {
-        const leftValue = String(left[column] ?? "");
-        const rightValue = String(right[column] ?? "");
-        return options.ascending
-          ? leftValue.localeCompare(rightValue)
-          : rightValue.localeCompare(leftValue);
-      });
-
-      return Promise.resolve({ data: sortedRows, error: null });
-    },
+    order() { return query; },
+    gte(column: string, value: string) { filters.push((row) => String(row[column]) >= value); return query; },
+    lte(column: string, value: string) { filters.push((row) => String(row[column]) <= value); return query; },
+    not(column: string, operator: string, value: unknown) { filters.push((row) => row[column] !== value); return query; },
+    range(start: number, end: number) { return Promise.resolve({ data: filteredRows().slice(start, end + 1), error: null }); },
+    limit(count: number) { return Promise.resolve({ data: filteredRows().slice(0, count), error: null }); },
     insert(payload: ExportTableRow | ExportTableRow[]) {
       const payloadRows = Array.isArray(payload) ? payload : [payload];
       const insertedRows = payloadRows.map((row, index) => ({
@@ -455,10 +452,92 @@ describe("POST /api/exports", () => {
           exportJobId: "00000000-0000-0000-0000-800000000001",
           exportType: "PUBLISHED_PAYSLIPS",
           status: "COMPLETED",
+          format: "csv",
+          rowCount: 1,
+          importId: undefined,
+          periodStart: undefined,
+          periodEnd: undefined,
         },
         resourceId: "00000000-0000-0000-0000-800000000001",
         resourceType: "export_job",
       }),
     );
   });
+  it.each([
+    { format: "exe" }, { periodStart: "2026-02-30" },
+    { periodStart: "2026-07-01", periodEnd: "2026-06-01" },
+    { importId: "not-an-id" }, { format: "pdf", exportType: "IMPORT_REPORT" },
+  ])("rejects invalid formats or filters %j", async (extra) => {
+    mockExportClient({ actorRole: "hr_central" });
+    const response = await POST(createExportRequest({ exportType: "IMPORT_REPORT", ...extra }));
+    expect(response.status).toBe(422);
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it.each(["csv", "xlsx", "pdf"])("denies manager published exports in %s", async (format) => {
+    mockExportClient({ actorRole: "agency_manager", actorAgencyId: AGENCY_ID });
+    expect((await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS", agencyId: AGENCY_ID, format }))).status).toBe(403);
+  });
+
+  it("filters own-agency reports by import and period and returns XLSX", async () => {
+    const { db } = mockExportClient({ actorRole: "agency_manager", actorAgencyId: AGENCY_ID });
+    mockAdminExportClient(db);
+    const row = { agency_id: AGENCY_ID, id: "00000000-0000-0000-0000-000000000777", created_at: "2026-06-30", period_start: "2026-06-01", period_end: "2026-06-30", status: "COMPLETED", source_filename: "own.xlsx", valid_row_count: 1, invalid_row_count: 0, unknown_employee_count: 0 };
+    db.payroll_imports.push(row, { ...row, agency_id: OTHER_AGENCY_ID, source_filename: "secret.xlsx" });
+    const response = await POST(createExportRequest({ exportType: "IMPORT_REPORT", agencyId: AGENCY_ID, importId: row.id, format: "xlsx", periodStart: "2026-06-01", periodEnd: "2026-06-30" }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("spreadsheetml");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(new Uint8Array(await response.arrayBuffer()).slice(0, 2)).toEqual(new Uint8Array([80, 75]));
+    expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ rowCount: 1, format: "xlsx", importId: row.id }) }));
+    expect(db.export_jobs[0].period_start).toBe("2026-06-01");
+  });
+
+  it("refuses to deliver an export when audit recording fails", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    mockAdminExportClient(db);
+    auditMocks.recordAuditEvent.mockRejectedValueOnce(new Error("audit failed"));
+    expect((await POST(createExportRequest({ exportType: "IMPORT_REPORT" }))).status).toBe(500);
+  });
+
+  it("does not silently truncate more than 5000 rows", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    db.payroll_imports.push(...Array.from({ length: 5001 }, (_, index) => ({ id: String(index) })));
+    const response = await POST(createExportRequest({ exportType: "IMPORT_REPORT" }));
+    expect(response.status).toBe(422);
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("renders HR PDFs from published versions and audits format", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    mockAdminExportClient(db);
+    db.payslips.push({ id: "fiche-1", agency_id: AGENCY_ID, period_start: "2026-06-01", period_end: "2026-06-30", published_at: "2026-06-30", current_version_id: "version-1", employee: { full_name: "Élodie" }, current_version: { snapshot_data: { grossAmount: 100, deductionsTotal: 20, netAmount: 80 }, pay_items: [] } });
+    const response = await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS", format: "pdf", agencyId: AGENCY_ID }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/pdf");
+    expect((await response.text()).startsWith("%PDF-")).toBe(true);
+    expect(auditMocks.recordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ format: "pdf", rowCount: 1 }) }));
+  });
+
+  it("fails rather than exporting a missing numeric value as zero", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    db.payroll_analytics_rows.push({ agency_id: AGENCY_ID, agency_name: "Agence", employee_id: "EMP01", employee_name: "Salarié", period_start: "2026-06-01", period_end: "2026-06-30", published_at: "2026-06-30", gross_amount: "", deductions_total: 10, net_amount: 20 });
+    expect((await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS" }))).status).toBe(500);
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("returns an explicit error for no published PDFs", async () => {
+    mockExportClient({ actorRole: "hr_central" });
+    const response = await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS", format: "pdf" }));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: { message: "Aucune fiche publiée dans cette sélection." } });
+  });
+
+  it("rejects PDF batches over 100 before rendering", async () => {
+    const { db } = mockExportClient({ actorRole: "hr_central" });
+    db.payslips.push(...Array.from({ length: 101 }, (_, index) => ({ id: String(index), current_version_id: "version" })));
+    expect((await POST(createExportRequest({ exportType: "PUBLISHED_PAYSLIPS", format: "pdf" }))).status).toBe(422);
+    expect(adminMocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
 });

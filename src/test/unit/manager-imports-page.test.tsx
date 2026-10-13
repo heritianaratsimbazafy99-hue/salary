@@ -272,6 +272,7 @@ function createRowsQuery(rows: unknown[]) {
     eq: vi.fn(() => query),
     in: vi.fn(() => query),
     limit: vi.fn(() => query),
+    range: vi.fn(async (start: number, end: number) => ({ data: rows.slice(start, end + 1), error: null })),
     order: vi.fn(() => query),
     select: vi.fn(() => query),
     then: result.then.bind(result),

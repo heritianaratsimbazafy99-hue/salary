@@ -71,6 +71,12 @@ jobs:
       - name: Reset local database
         run: npm run db:reset:local
 
+      - name: Verify database lifecycle and retention
+        run: |
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/payroll-retention.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/payroll-manager-review.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < src/test/rls/admin-lifecycle-postflight.sql
+
       - name: Run authenticated browser tests
         run: npm run test:e2e -- --project=chromium
 

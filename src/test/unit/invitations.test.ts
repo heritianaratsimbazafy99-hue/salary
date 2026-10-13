@@ -123,24 +123,24 @@ describe("InvitationConfirmation", () => {
   it("renders the empty state", () => {
     render(createElement(InvitationConfirmation, { candidates: [] }));
 
-    expect(screen.getByText("Aucun nouveau salarie a inviter.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "0 destinataires" })).toBeTruthy();
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
-  it("renders candidates with a checked invitation checkbox", () => {
+  it("shows every publication recipient without implying invitations are optional", () => {
     render(
       createElement(InvitationConfirmation, {
         candidates: [{ employeeId: "EMP-003", email: "three@example.com", employeeName: "Three" }],
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "Nouveaux salaries detectes" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "1 destinataires" })).toBeTruthy();
     expect(screen.getByText("Three")).toBeTruthy();
     expect(screen.getByText("three@example.com")).toBeTruthy();
 
-    const checkbox = screen.getByRole("checkbox", { name: /Three/ }) as HTMLInputElement;
-    expect(checkbox.name).toBe("inviteEmployeeId");
-    expect(checkbox.value).toBe("EMP-003");
-    expect(checkbox.checked).toBe(true);
+    expect(screen.getByRole("listitem").textContent).toContain("EMP-003");
+    expect(screen.getByText(/Chaque salarié recevra un email/)).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
   it("keeps long candidate details wrappable on narrow screens", () => {
@@ -155,12 +155,10 @@ describe("InvitationConfirmation", () => {
 
     const name = screen.getByText(longName);
     const email = screen.getByText(longEmail);
-    const textWrapper = name.parentElement;
-    const label = name.closest("label");
+    const recipient = name.closest("li");
 
-    expect(label?.className).toContain("items-start");
-    expect(textWrapper?.className).toContain("min-w-0");
-    expect(textWrapper?.className).toContain("flex-1");
+    expect(recipient?.className).toContain("min-w-0");
+    expect(recipient?.className).toContain("break-words");
     expect(name.className).toContain("break-words");
     expect(email.className).toContain("break-all");
   });

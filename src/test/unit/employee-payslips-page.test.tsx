@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const employeePayslipsMocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   redirect: vi.fn(),
+  notFound: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
   redirect: employeePayslipsMocks.redirect,
+  notFound: employeePayslipsMocks.notFound,
   usePathname: () => "/employee/payslips",
 }));
 
@@ -23,6 +25,7 @@ describe("EmployeePayslipsPage", () => {
     vi.resetModules();
     employeePayslipsMocks.createClient.mockReset();
     employeePayslipsMocks.redirect.mockReset();
+    employeePayslipsMocks.notFound.mockImplementation(() => { throw new Error("NEXT_NOT_FOUND"); });
     employeePayslipsMocks.redirect.mockImplementation((href: string) => {
       throw new Error(`NEXT_REDIRECT:${href}`);
     });
@@ -105,7 +108,59 @@ describe("EmployeePayslipsPage", () => {
     expect(screen.getByRole("heading", { name: "Acces refuse" })).toBeTruthy();
     expect(client.from).not.toHaveBeenCalledWith("payslips");
   });
+
+  it("opens a prior period's current published version and marks the selected history link", async () => {
+    const client = createEmployeePayslipClient({
+      claimsSub: "auth-id",
+      profile: { id: PROFILE_ID, role: "employee" },
+      payslipRows: [publishedRow("latest", "2026-06-01", "June allowance"), publishedRow("earlier", "2026-05-01", "May allowance")],
+    });
+    employeePayslipsMocks.createClient.mockResolvedValue(client);
+    const { default: Page } = await import("@/app/employee/payslips/page");
+    render(await Page({ searchParams: Promise.resolve({ payslip: "earlier" }) }));
+    expect(screen.getByText("May allowance")).toBeTruthy();
+    expect(screen.queryByText("June allowance")).toBeNull();
+    expect(screen.getByRole("link", { name: /2026-05-01/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Télécharger PDF" }).getAttribute("href")).toBe("/api/employee/payslips/earlier/pdf");
+    expect(client.payslipsQuery.not).toHaveBeenCalledWith("current_version_id", "is", null);
+    expect(client.payslipsQuery.or).toHaveBeenCalledWith(expect.stringMatching(/^expires_at\.is\.null,expires_at\.gt\.\d{4}-/));
+    expect(client.payslipsQuery.select.mock.calls[0][0]).toContain("payslips_current_version_fk");
+  });
+
+  it("returns not found for an inaccessible selection without falling back to another payslip", async () => {
+    employeePayslipsMocks.createClient.mockResolvedValue(createEmployeePayslipClient({
+      claimsSub: "auth-id",
+      profile: { id: PROFILE_ID, role: "employee" },
+      payslipRows: [publishedRow("owned", "2026-06-01", "Private allowance")],
+    }));
+    const { default: Page } = await import("@/app/employee/payslips/page");
+    await expect(Page({ searchParams: Promise.resolve({ payslip: "someone-else" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("fails closed if an unexpected foreign employee row is returned", async () => {
+    const foreignRow = publishedRow("foreign", "2026-06-01", "Foreign allowance");
+    foreignRow.employee.profile_id = "other-profile";
+    employeePayslipsMocks.createClient.mockResolvedValue(createEmployeePayslipClient({
+      claimsSub: "auth-id", profile: { id: PROFILE_ID, role: "employee" }, payslipRows: [foreignRow],
+    }));
+    const { default: Page } = await import("@/app/employee/payslips/page");
+    render(await Page());
+    expect(screen.getByRole("heading", { name: "Acces refuse" })).toBeTruthy();
+    expect(screen.queryByText("Foreign allowance")).toBeNull();
+  });
 });
+
+function publishedRow(id: string, start: string, label: string) {
+  return {
+    id, period_start: start, period_end: start.replace("-01", "-28"), published_at: `${start}T08:00:00Z`,
+    employee: { full_name: "Rina Salary", profile_id: PROFILE_ID },
+    current_version: {
+      id: `${id}-current`,
+      pay_items: [{ amount: 1000, category: "BENEFIT", label }],
+      snapshot_data: { grossAmount: 1500000, deductionsTotal: 250000, netAmount: 1250000 },
+    },
+  };
+}
 
 function createEmployeePayslipClient(input: {
   claimsSub: string | null;
@@ -122,8 +177,9 @@ function createEmployeePayslipClient(input: {
     eq: vi.fn(() => payslipsQuery),
     limit: vi.fn(() => payslipsQuery),
     not: vi.fn(() => payslipsQuery),
+    or: vi.fn(() => payslipsQuery),
     order: vi.fn(() => payslipsQuery),
-    select: vi.fn(() => payslipsQuery),
+    select: vi.fn((...args: string[]) => { void args; return payslipsQuery; }),
     then: payslipResult.then.bind(payslipResult),
   };
 

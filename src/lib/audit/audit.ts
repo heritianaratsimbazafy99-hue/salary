@@ -1,5 +1,8 @@
 const ALLOWED_METADATA_KEYS = new Set([
   "rowCount",
+  "format",
+  "exportType",
+  "exportJobId",
   "filename",
   "resourceId",
   "status",

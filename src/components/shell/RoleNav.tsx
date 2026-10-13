@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Building2, FileText, FileUp, ScrollText, Users } from "lucide-react";
+import { Activity, BarChart3, BookOpen, Building2, Download, FileText, FileUp, ScrollText, Users } from "lucide-react";
 
 import type { AppRole } from "@/lib/roles";
 
@@ -21,12 +21,15 @@ const LINKS_BY_ROLE: Record<AppRole, NavLink[]> = {
     { href: "/hr/users", label: "Utilisateurs", icon: Users },
     { href: "/hr/audit", label: "Audit", icon: ScrollText },
     { href: "/hr/analytics", label: "Analyses", icon: BarChart3 },
+    { href: "/hr/exports", label: "Exports", icon: Download },
   ],
   super_admin: [
     { href: "/hr/agencies", label: "Agences", icon: Building2 },
     { href: "/hr/users", label: "Utilisateurs", icon: Users },
     { href: "/hr/audit", label: "Audit", icon: ScrollText },
     { href: "/hr/analytics", label: "Analyses", icon: BarChart3 },
+    { href: "/hr/exports", label: "Exports", icon: Download },
+    { href: "/hr/operations", label: "Opérations", icon: Activity },
   ],
 };
 
@@ -42,7 +45,7 @@ export function RoleNav({ role }: RoleNavProps) {
       aria-label="Navigation principale"
       className="flex flex-wrap items-center gap-1 rounded-2xl border border-border/70 bg-surface/70 p-1 shadow-[var(--shadow-xs)] backdrop-blur-sm"
     >
-      {LINKS_BY_ROLE[role].map((link) => {
+      {[...LINKS_BY_ROLE[role], { href: "/help", label: "Guide", icon: BookOpen }].map((link) => {
         const isCurrent = pathname === link.href || pathname.startsWith(`${link.href}/`);
 
         return (

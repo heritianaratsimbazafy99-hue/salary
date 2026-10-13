@@ -1,7 +1,10 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 import { Download, FileText, History } from "lucide-react";
 
 import { PayslipView } from "@/components/payslips/PayslipView";
+import { PrintPayslipButton } from "@/components/payslips/PrintPayslipButton";
+import { DownloadPayslipPdfButton } from "@/components/payslips/DownloadPayslipPdfButton";
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -11,10 +14,15 @@ import {
 } from "@/lib/admin/permissions";
 import { loadEmployeePayslips, type EmployeePayslip } from "@/lib/payslips/employee";
 import { createClient } from "@/lib/supabase/server";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
-export default async function EmployeePayslipsPage() {
+export default async function EmployeePayslipsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ payslip?: string | string[] }>;
+} = {}) {
   const supabase = await createClient();
   let payslips: Awaited<ReturnType<typeof loadEmployeePayslips>>;
 
@@ -32,19 +40,33 @@ export default async function EmployeePayslipsPage() {
     throw error;
   }
 
+  const requestedId = (await searchParams)?.payslip;
+  const selectedPayslip = requestedId === undefined
+    ? payslips[0]
+    : payslips.find((payslip) => payslip.id === requestedId);
+
+  // Select only within this employee's RLS-filtered published documents.
+  if (requestedId !== undefined && !selectedPayslip) notFound();
+
   return (
     <AppShell role="employee">
       <div className="mx-auto max-w-3xl space-y-8">
-        <PageHeader
-          eyebrow="Espace salarié"
-          title="Mes fiches de paie"
-          description="Consultez et téléchargez vos fiches internes publiées."
-          actions={payslips.length > 0 ? <DownloadPayslipsLink /> : null}
-        />
-        {payslips[0] ? (
+        <div className={styles.controls}>
+          <PageHeader
+            eyebrow="Espace salarié"
+            title="Mes fiches de paie"
+            description="Consultez et téléchargez vos fiches internes publiées."
+            actions={payslips.length > 0 ? <DownloadPayslipsLink /> : null}
+          />
+        </div>
+        {selectedPayslip ? (
           <>
-            <PayslipView {...payslips[0]} />
-            <PayslipHistory payslips={payslips} />
+            <div className={`${styles.controls} flex flex-wrap items-center justify-end gap-2`}>
+              <DownloadPayslipPdfButton key={selectedPayslip.id} payslipId={selectedPayslip.id} />
+              <PrintPayslipButton />
+            </div>
+            <PayslipView {...selectedPayslip} />
+            <PayslipHistory payslips={payslips} selectedId={selectedPayslip.id} />
           </>
         ) : (
           <EmptyPayslipState />
@@ -66,9 +88,9 @@ function DownloadPayslipsLink() {
   );
 }
 
-function PayslipHistory({ payslips }: { payslips: EmployeePayslip[] }) {
+function PayslipHistory({ payslips, selectedId }: { payslips: EmployeePayslip[]; selectedId: string }) {
   return (
-    <section className="rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
+    <section className={`${styles.controls} rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]`}>
       <div className="flex items-center gap-2.5">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <History className="size-4" aria-hidden="true" />
@@ -81,15 +103,22 @@ function PayslipHistory({ payslips }: { payslips: EmployeePayslip[] }) {
             className="group flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-primary/[0.04]"
             key={payslip.id}
           >
-            <span>
-              <span className="block text-sm font-medium">{payslip.periodLabel}</span>
-              <span className="block text-xs text-muted-foreground">
-                Publiée le {formatDate(payslip.publishedAt)}
+            <Link
+              aria-current={payslip.id === selectedId ? "page" : undefined}
+              className="flex min-h-11 flex-1 items-center justify-between gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              href={`/employee/payslips?payslip=${payslip.id}`}
+              scroll={false}
+            >
+              <span>
+                <span className="block text-sm font-medium">{payslip.periodLabel}</span>
+                <span className="block text-xs text-muted-foreground">
+                  Publiée le {formatDate(payslip.publishedAt)}{payslip.id === selectedId ? " · Fiche affichée" : " · Consulter"}
+                </span>
               </span>
-            </span>
-            <span className="font-display text-sm font-semibold tabular-nums">
-              {formatMga(payslip.netAmount)}
-            </span>
+              <span className="font-display text-sm font-semibold tabular-nums">
+                {formatMga(payslip.netAmount)}
+              </span>
+            </Link>
           </li>
         ))}
       </ul>

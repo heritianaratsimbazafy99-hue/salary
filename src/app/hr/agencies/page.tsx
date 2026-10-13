@@ -1,144 +1,56 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/Table";
+import { AdminForm, type AdminFormResult } from "@/lib/admin/AdminForm";
 import { requireCanManageAgencies } from "@/lib/admin/auth";
-import { createAgency, listAgencies } from "@/lib/admin/agencies";
-import {
-  AUTH_REQUIRED_ERROR_MESSAGE,
-  FORBIDDEN_ERROR_MESSAGE,
-} from "@/lib/admin/permissions";
-
+import { saveAgency, listAgencies } from "@/lib/admin/agencies";
+import { AUTH_REQUIRED_ERROR_MESSAGE, FORBIDDEN_ERROR_MESSAGE } from "@/lib/admin/permissions";
 export const dynamic = "force-dynamic";
-
-function formText(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
-}
-
-async function createAgencyAction(formData: FormData) {
+async function save(form: FormData): Promise<AdminFormResult> {
   "use server";
-
-  await createAgency({
-    code: formText(formData, "code"),
-    name: formText(formData, "name"),
-  });
-
-  revalidatePath("/hr/agencies");
-  revalidatePath("/hr/users");
+  try {
+    await saveAgency({ id: String(form.get("id") || "") || undefined, name: String(form.get("name") || ""), code: String(form.get("code") || ""), isActive: form.get("isActive") === "on" });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Enregistrement impossible." }; }
+  revalidatePath("/hr/agencies"); revalidatePath("/hr/users");
+  return { success: "Agence enregistrée." };
 }
-
 export default async function AgenciesPage() {
   let role: Awaited<ReturnType<typeof requireCanManageAgencies>>;
-
-  try {
-    role = await requireCanManageAgencies();
-  } catch (error) {
-    if (hasErrorMessage(error, AUTH_REQUIRED_ERROR_MESSAGE)) {
-      redirect("/auth/login");
-    }
-
-    if (hasErrorMessage(error, FORBIDDEN_ERROR_MESSAGE)) {
-      return <ForbiddenAgenciesAccess />;
-    }
-
+  try { role = await requireCanManageAgencies(); }
+  catch (error) {
+    if (error instanceof Error && error.message === AUTH_REQUIRED_ERROR_MESSAGE) redirect("/auth/login");
+    if (error instanceof Error && error.message === FORBIDDEN_ERROR_MESSAGE) return <AccessDenied context="Administration RH" />;
     throw error;
   }
-
   const agencies = await listAgencies();
-
-  return (
-    <AppShell role={role}>
-      <div className="flex flex-col gap-8">
-        <PageHeader
-          eyebrow="Administration RH"
-          title="Agences"
-          description="Creation et suivi des agences actives de la plateforme."
-        />
-
-        <section aria-labelledby="create-agency-title" className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-xs)]">
-          <h2 className="font-display text-base font-semibold" id="create-agency-title">
-            Nouvelle agence
-          </h2>
-          <form action={createAgencyAction} className="mt-4 grid gap-4 md:grid-cols-[1fr_12rem_auto] md:items-end">
-            <Input
-              autoComplete="organization"
-              label="Nom de l'agence"
-              name="name"
-              placeholder="Agence Antananarivo"
-              required
-            />
-            <Input
-              autoCapitalize="characters"
-              label="Code"
-              maxLength={32}
-              name="code"
-              placeholder="TNR"
-              required
-            />
-            <Button type="submit">Creer</Button>
-          </form>
-        </section>
-
-        <section aria-labelledby="agencies-list-title" className="grid gap-4">
-          <div>
-            <h2 className="font-display text-base font-semibold" id="agencies-list-title">
-              Liste des agences
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Les responsables d&apos;agence seront rattaches a ces agences.
-            </p>
-          </div>
-
-          {agencies.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Statut</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agencies.map((agency) => (
-                  <TableRow key={agency.id}>
-                    <TableCell className="font-medium text-foreground">{agency.name}</TableCell>
-                    <TableCell>{agency.code}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={agency.is_active ? "ACTIVE" : "INACTIVE"} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-              Aucune agence n&apos;est encore enregistree.
-            </p>
-          )}
-        </section>
-      </div>
-    </AppShell>
-  );
-}
-
-function ForbiddenAgenciesAccess() {
-  return <AccessDenied context="Administration RH" />;
-}
-
-function hasErrorMessage(error: unknown, message: string): error is Error {
-  return error instanceof Error && error.message === message;
+  return <AppShell role={role}><div className="flex flex-col gap-8">
+    <PageHeader eyebrow="Administration RH" title="Agences" description="Créez, modifiez ou suspendez une agence en conservant ses données et son historique." />
+    <section className="rounded-2xl border border-border bg-surface p-6" aria-labelledby="new-agency">
+      <h2 id="new-agency" className="font-display font-semibold">Nouvelle agence</h2>
+      <AdminForm action={save} label="Nouvelle agence" resetOnSuccess className="mt-4 grid gap-4 md:grid-cols-[1fr_12rem_auto] md:items-end">
+        <Input label="Nom de l'agence" name="name" maxLength={160} required /><Input label="Code" name="code" maxLength={32} required />
+        <input type="hidden" name="isActive" value="on" /><Button type="submit">Créer</Button>
+      </AdminForm>
+    </section>
+    <section className="grid min-w-0 grid-cols-1 gap-4" aria-labelledby="agencies-list">
+      <h2 id="agencies-list" className="font-display font-semibold">Liste des agences</h2>
+      <p className="text-sm text-muted-foreground">La désactivation bloque immédiatement les accès des responsables et des salariés de cette agence, y compris leurs sessions ouvertes. Les autres affectations actives des salariés restent accessibles. La réactivation rétablit ces accès.</p>
+      {agencies.map((agency) => <article key={agency.id} className="min-w-0 rounded-2xl border border-border bg-surface p-5">
+        <div className="mb-4 flex items-center justify-between gap-2"><h3 className="font-semibold">{agency.name}</h3><StatusBadge status={agency.is_active ? "ACTIVE" : "INACTIVE"} /></div>
+        <AdminForm action={save} label={`Modifier l’agence ${agency.name}`} className="grid items-end gap-4 md:grid-cols-[1fr_10rem_auto_auto]">
+          <input type="hidden" name="id" value={agency.id} />
+          <Input id={`name-${agency.id}`} label="Nom de l'agence" name="name" defaultValue={agency.name} maxLength={160} required />
+          <Input id={`code-${agency.id}`} label="Code" name="code" defaultValue={agency.code} maxLength={32} required />
+          <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={agency.is_active} />Agence active</label>
+          <Button type="submit" variant="secondary">Enregistrer</Button>
+        </AdminForm>
+      </article>)}
+      {!agencies.length ? <p className="text-sm text-muted-foreground">Aucune agence enregistrée.</p> : null}
+    </section>
+  </div></AppShell>;
 }
