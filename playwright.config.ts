@@ -23,6 +23,8 @@ const useProductionBuild = process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Keep load-test manifests and release evidence outside Playwright's cleanup.
+  outputDir: "./test-results/playwright",
   timeout: process.env.CI ? 60_000 : 30_000,
   retries: 0,
   workers: 1,

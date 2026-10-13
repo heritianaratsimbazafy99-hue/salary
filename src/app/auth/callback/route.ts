@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAppRole } from "@/lib/admin/permissions";
+import { isAuthRateLimitError } from "@/lib/auth/errors";
 import { acceptVerifiedEmployeeInvitation, INVITATION_CONTEXT_COOKIE, readInvitationContext } from "@/lib/employees/activation";
 import { getPublicSupabaseConfig } from "@/lib/env.public";
 import type { AppRole } from "@/lib/roles";
@@ -51,6 +52,9 @@ export async function GET(request: NextRequest) {
       if (!context) return failed();
       const supabase = await createServerSupabaseClient();
       const { error } = await supabase.auth.verifyOtp({ token_hash: authToken, type: "email" });
+      // A throttled verification has not consumed the proof. Keep the signed
+      // browser context so the same email can be opened again after the burst.
+      if (isAuthRateLimitError(error)) return loginRedirect(request, "callback_rate_limited");
       if (error) return failed();
       const { data, error: userError } = await supabase.auth.getUser();
       if (userError || !data.user) return failed();
@@ -80,7 +84,10 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return loginRedirect(request, "callback_failed");
+    // PKCE differs from invitation verifyOtp: Auth has already redirected the
+    // email proof, and auth-js removes its code verifier even on failure.
+    // The login message asks for a NEW link after the throttle has cleared.
+    return loginRedirect(request, isAuthRateLimitError(error) ? "callback_rate_limited" : "callback_failed");
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser();

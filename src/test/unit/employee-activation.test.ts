@@ -201,6 +201,37 @@ describe("browser-bound invitation callback", () => {
     expect(response.headers.get("location")).toContain("/auth/invitation?error=activation_failed");
   });
 
+  it.each([{ status: 429 }, { code: "over_request_rate_limit" }])("keeps the invitation context and proof retryable after Auth throttling (%j)", async (error) => {
+    const testClients = clients();
+    testClients.server.auth.verifyOtp.mockResolvedValueOnce({ error });
+    const request = callbackRequest();
+    const context = request.cookies.get(INVITATION_CONTEXT_COOKIE)?.value;
+    const response = await GET(request);
+
+    expect(response.headers.get("location")).toBe("https://paie.example.test/auth/invitation?error=callback_rate_limited");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.cookies.has(INVITATION_CONTEXT_COOKIE)).toBe(false);
+    expect(request.cookies.get(INVITATION_CONTEXT_COOKIE)?.value).toBe(context);
+    expect(testClients.server.auth.verifyOtp).toHaveBeenCalledTimes(1);
+    expect(testClients.server.auth.getUser).not.toHaveBeenCalled();
+    expect(testClients.admin.rpc).not.toHaveBeenCalled();
+
+    const retried = await GET(request);
+    expect(retried.headers.get("location")).toBe("https://paie.example.test/employee/payslips");
+    expect(testClients.admin.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("distinguishes a throttled PKCE exchange from an expired link without retrying automatically", async () => {
+    const testClients = clients();
+    testClients.server.auth.exchangeCodeForSession.mockResolvedValue({ error: { status: 429 } });
+    const response = await GET(callbackRequest(false));
+    expect(response.headers.get("location")).toBe("https://paie.example.test/auth/login?error=callback_rate_limited");
+    expect(testClients.server.auth.exchangeCodeForSession).toHaveBeenCalledTimes(1);
+    expect(testClients.server.auth.getUser).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+
   it("does not trust a session when getUser fails", async () => {
     const testClients = clients();
     testClients.server.auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: "invalid" } });

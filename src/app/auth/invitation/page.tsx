@@ -27,6 +27,7 @@ export default async function InvitationPage({ searchParams }: Props) {
     }
   }
   const callbackFailed = typeof params.error === "string";
+  const callbackRateLimited = params.error === "callback_rate_limited";
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10 text-foreground">
@@ -43,7 +44,9 @@ export default async function InvitationPage({ searchParams }: Props) {
           </>
         ) : (
           <p role="alert" className="mt-6 rounded-xl border border-border bg-background p-4 text-sm leading-6">
-            {state === "expired"
+            {callbackRateLimited
+              ? "Le service de connexion reçoit trop de demandes. Patientez quelques minutes, puis rouvrez le même email de confirmation dans ce navigateur. Cette erreur ne signifie pas que votre lien a expiré. Si le blocage persiste, contactez votre responsable."
+              : state === "expired"
               ? "Cette invitation a expiré. Demandez une nouvelle invitation à votre responsable."
               : state === "load_failed"
                 ? "Impossible de vérifier votre invitation pour le moment. Actualisez cette page dans quelques instants."

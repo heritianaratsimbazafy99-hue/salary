@@ -18,6 +18,7 @@ Vérifier les identités et la configuration actuelles avant écriture externe. 
 - Conservation des fiches : un an calendaire UTC. Voir `docs/operations/payroll-retention.md`.
 - Sauvegardes explicitement reportées. Ne pas activer d'abonnement ou de sauvegarde ; ne pas bloquer cette livraison sur cet ancien prérequis.
 - Support et alertes adressés à l'email du propriétaire configuré dans la page d'aide et Sentry.
+- Effectif initial : Airtel 300, Huawei 40. Resend Pro choisi, souscription à effectuer par le propriétaire. Quotas, limites et protocole de charge : `docs/operations/capacity-airtel-huawei.md` ; ne pas confondre choix de l'offre et activation effective.
 
 ## Vérification et livraison
 

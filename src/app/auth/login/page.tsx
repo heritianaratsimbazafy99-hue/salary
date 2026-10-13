@@ -17,6 +17,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Reveal } from "@/components/marketing/Reveal";
 
 import { buildMagicLinkOtpOptions } from "@/lib/auth/magic-link";
+import { magicLinkFailureCode } from "@/lib/auth/errors";
 import { getPublicSupabaseConfig } from "@/lib/env.public";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -44,6 +45,14 @@ const LOGIN_MESSAGES = {
   otp_failed: {
     tone: "error",
     text: "Impossible d’envoyer le lien pour le moment.",
+  },
+  otp_rate_limited: {
+    tone: "error",
+    text: "La limite temporaire d’envoi ou de demandes est atteinte. Si vous avez déjà reçu un lien, utilisez le dernier email. Sinon, patientez avant de réessayer. Si le blocage persiste, contactez votre responsable.",
+  },
+  callback_rate_limited: {
+    tone: "error",
+    text: "Le service de connexion reçoit trop de demandes. Patientez quelques minutes, puis demandez un nouveau lien depuis cette page et ouvrez-le dans ce navigateur. Cette erreur ne signifie pas que votre lien a expiré.",
   },
   sent: {
     tone: "success",
@@ -102,7 +111,7 @@ async function requestMagicLink(formData: FormData) {
   });
 
   if (error) {
-    redirect("/auth/login?error=otp_failed");
+    redirect(`/auth/login?error=${magicLinkFailureCode(error)}`);
   }
 
   redirect("/auth/login?sent=1");

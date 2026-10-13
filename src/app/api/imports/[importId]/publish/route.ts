@@ -14,6 +14,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// The bounded employee preparation and mail batches share one publication request.
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest, context: { params: Promise<{ importId: string }> }) {
   const { importId } = await context.params;
   const normalizedImportId = importId.trim();
@@ -69,6 +72,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ im
       data: {
         importId: result.importId,
         publishedCount: result.publishedCount,
+        emailSentCount: result.emailSentCount,
+        emailFailedCount: result.emailFailedCount,
+        notificationCount: result.notificationCount,
         status: result.status,
       },
     });

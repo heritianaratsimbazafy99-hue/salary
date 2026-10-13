@@ -6,7 +6,7 @@ import {
   ensureEmployeeAuthProfile,
   type ProvisionedEmployeeAuthProfile,
 } from "@/lib/employees/linking";
-import { sendPayslipPublishedEmail } from "@/lib/notifications/resend-server";
+import { EMAIL_DELIVERY_UNCONFIRMED, sendPayslipPublishedEmail, sendPayslipPublishedEmails, type EmailDeliveryResult } from "@/lib/notifications/resend-server";
 
 type SupabaseReadClient = Pick<SupabaseClient, "from">;
 type SupabasePublishClient = Pick<SupabaseClient, "auth" | "from" | "rpc">;
@@ -33,6 +33,8 @@ type NotificationRecord = {
   id?: unknown;
   recipient_email?: unknown;
   resource_id?: unknown;
+  failure_reason?: unknown;
+  status?: unknown;
 };
 
 type PublishRpcRecord = {
@@ -111,22 +113,24 @@ export async function publishPayrollImport(input: {
     agencyId: result.agencyId,
     importId: input.importId,
   });
-  for (const employee of employeeIdentities) {
-    try {
-      provisionedEmployees.push(await ensureEmployeeAuthProfile({
-        agencyId: payrollImport.agencyId, email: employee.email,
-        employeeId: employee.employeeId, fullName: employee.fullName,
-        invitedByProfileId: input.actor.id,
-      }, writeSupabase));
-    } catch {
-      // Notification remains tracked as FAILED below and may be retried by a manager.
-    }
+  // Bound cross-region database work without opening hundreds of connections.
+  for (let start = 0; start < employeeIdentities.length; start += 8) {
+    const batch = await Promise.all(employeeIdentities.slice(start, start + 8).map(async (employee) => {
+      try {
+        return await ensureEmployeeAuthProfile({
+          agencyId: payrollImport.agencyId, email: employee.email,
+          employeeId: employee.employeeId, fullName: employee.fullName,
+          invitedByProfileId: input.actor.id,
+        }, writeSupabase);
+      } catch { return null; }
+    }));
+    provisionedEmployees.push(...batch.filter((employee): employee is ProvisionedEmployeeAuthProfile => employee !== null));
   }
   const emailResult = await sendPayslipPublishedNotifications({
     agencyId: result.agencyId,
     provisionedEmployees,
     importId: input.importId,
-    sendPayslipEmail: input.sendPayslipEmail ?? sendPayslipPublishedEmail,
+    sendPayslipEmail: input.sendPayslipEmail,
     supabase: writeSupabase,
   });
 
@@ -147,7 +151,7 @@ async function sendPayslipPublishedNotifications(input: {
   agencyId: string;
   provisionedEmployees: ProvisionedEmployeeAuthProfile[];
   importId: string;
-  sendPayslipEmail: typeof sendPayslipPublishedEmail;
+  sendPayslipEmail?: typeof sendPayslipPublishedEmail;
   supabase: SupabasePublishClient;
 }) {
   const notifications = await loadPublishedPayslipNotifications(input.supabase, {
@@ -160,30 +164,37 @@ async function sendPayslipPublishedNotifications(input: {
   let sent = 0;
   let failed = 0;
 
-  for (const notification of notifications) {
+  const deliverable = notifications.flatMap((notification) => {
     const employee = employeesByEmail.get(notification.recipientEmail.toLowerCase());
-    const employeeName = employee?.fullName ?? "Salarie";
-
-    try {
-      if (!employee) throw new Error("Préparation de l’accès salarié impossible.");
-      const response = await input.sendPayslipEmail({
-        employeeName,
-        ...(employee?.invitationToken ? { invitationToken: employee.invitationToken } : {}),
-        to: notification.recipientEmail,
-      });
-      if (response && typeof response === "object" && "error" in response && response.error) {
-        throw new Error("Le fournisseur email a refusé l'envoi.");
+    return employee ? [{ notification, employee }] : [];
+  });
+  const messages = deliverable.map(({ notification, employee }) => ({
+    employeeName: employee.fullName,
+    ...(employee.invitationToken ? { invitationToken: employee.invitationToken } : {}),
+    to: notification.recipientEmail,
+    idempotencyKey: `notification/${notification.id}`,
+  }));
+  const results: EmailDeliveryResult[] = input.sendPayslipEmail
+    ? await Promise.all(messages.map(async (message) => {
+      try { return await input.sendPayslipEmail!(message); }
+      catch { return { data: null, error: { message: "Email delivery failed." } }; }
+    }))
+    : await sendPayslipPublishedEmails(messages);
+  const deliveredById = new Map(deliverable.map(({ notification }, index) => [notification.id, results[index]]));
+  for (const notification of notifications) {
+    const delivery = deliveredById.get(notification.id);
+    if (delivery?.data?.id && !delivery.error) {
+      try {
+        await markNotificationSent(input.supabase, { notificationId: notification.id, providerMessageId: delivery.data.id });
+        sent += 1;
+      } catch {
+        await markNotificationFailed(input.supabase, { notificationId: notification.id, failureReason: EMAIL_DELIVERY_UNCONFIRMED });
+        failed += 1;
       }
-      const providerMessageId = parseProviderMessageId(response);
-
-      await markNotificationSent(input.supabase, {
-        notificationId: notification.id,
-        providerMessageId,
-      });
-      sent += 1;
-    } catch (error) {
+    } else {
       await markNotificationFailed(input.supabase, {
-        failureReason: employee?.invitationToken ? "Invitation email delivery failed." : safeFailureReason(error),
+        failureReason: delivery?.error?.code === EMAIL_DELIVERY_UNCONFIRMED
+          ? EMAIL_DELIVERY_UNCONFIRMED : employeesByEmail.get(notification.recipientEmail.toLowerCase())?.invitationToken ? "Invitation email delivery failed." : "Email delivery failed.",
         notificationId: notification.id,
       });
       failed += 1;
@@ -197,9 +208,9 @@ async function sendPayslipPublishedNotifications(input: {
   };
 }
 
-async function loadPublishedPayslipNotifications(
+export async function loadPublishedPayslipNotifications(
   supabase: SupabasePublishClient,
-  input: { agencyId: string; importId: string },
+  input: { agencyId: string; importId: string; includeFailed?: boolean },
 ) {
   const payslipIds: string[] = [];
   for (let offset = 0; ; offset += 500) {
@@ -220,9 +231,9 @@ async function loadPublishedPayslipNotifications(
   for (let start = 0; start < uniquePayslipIds.length; start += 100) {
     for (let offset = 0; ; offset += 500) {
       const { data: batch, error } = await supabase.from("notifications")
-        .select("id,recipient_email,resource_id")
+        .select("id,recipient_email,resource_id,failure_reason,status")
         .eq("notification_type", "PAYSLIP_PUBLISHED").eq("resource_type", "payslip")
-        .eq("status", "PENDING").in("resource_id", uniquePayslipIds.slice(start, start + 100))
+        .in("status", input.includeFailed ? ["PENDING", "FAILED"] : ["PENDING"]).in("resource_id", uniquePayslipIds.slice(start, start + 100))
         .order("id").range(offset, offset + 499);
       if (error) throw new Error("Impossible de charger les notifications à envoyer.");
       notifications.push(...(batch ?? []));
@@ -244,16 +255,18 @@ async function loadPublishedPayslipNotifications(
         id: notification.id,
         recipientEmail: notification.recipient_email,
         resourceId: notification.resource_id,
+        deliveryUnconfirmed: notification.failure_reason === EMAIL_DELIVERY_UNCONFIRMED,
+        pending: notification.status === "PENDING",
       },
     ];
   });
 }
 
-async function markNotificationSent(
+export async function markNotificationSent(
   supabase: SupabasePublishClient,
   input: { notificationId: string; providerMessageId: string | null },
 ) {
-  await supabase
+  const { error } = await supabase
     .from("notifications")
     .update({
       failed_at: null,
@@ -263,13 +276,14 @@ async function markNotificationSent(
       status: "SENT",
     })
     .eq("id", input.notificationId);
+  if (error) throw new Error("Impossible de journaliser le résultat email.");
 }
 
-async function markNotificationFailed(
+export async function markNotificationFailed(
   supabase: SupabasePublishClient,
   input: { failureReason: string; notificationId: string },
 ) {
-  await supabase
+  const { error } = await supabase
     .from("notifications")
     .update({
       failed_at: new Date().toISOString(),
@@ -277,30 +291,7 @@ async function markNotificationFailed(
       status: "FAILED",
     })
     .eq("id", input.notificationId);
-}
-
-function parseProviderMessageId(response: unknown) {
-  if (
-    response &&
-    typeof response === "object" &&
-    "data" in response &&
-    response.data &&
-    typeof response.data === "object" &&
-    "id" in response.data &&
-    typeof response.data.id === "string"
-  ) {
-    return response.data.id;
-  }
-
-  return null;
-}
-
-function safeFailureReason(error: unknown) {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.slice(0, 500);
-  }
-
-  return "Email delivery failed.";
+  if (error) throw new Error("Impossible de journaliser le résultat email.");
 }
 
 async function loadPayrollImport(supabase: SupabaseReadClient, importId: string) {
