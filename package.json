@@ -27,7 +27,7 @@
     "clsx": "2.1.1",
     "exceljs": "4.4.0",
     "lucide-react": "1.21.0",
-    "next": "16.2.9",
+    "next": "16.3.8",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "resend": "6.14.0",
@@ -35,19 +35,28 @@
     "tailwind-merge": "3.6.0",
     "zod": "4.4.3"
   },
+  "overrides": {
+    "@next/eslint-plugin-next@16.3.8": {
+      "fast-glob": "$fast-glob"
+    },
+    "exceljs@4.4.0": {
+      "uuid": "11.1.1"
+    }
+  },
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "@tailwindcss/postcss": "4.3.1",
+    "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@types/node": "26.0.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.8",
+    "fast-glob": "file:./vendor/next-eslint-glob",
     "jsdom": "29.1.1",
-    "tailwindcss": "4.3.1",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vitest": "4.1.9"
+    "vitest": "4.1.11"
   }
 }

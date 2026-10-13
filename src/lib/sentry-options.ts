@@ -56,6 +56,28 @@ export function sanitizeSentryErrorEvent(event: ErrorEvent) {
     delete event.user.username;
   }
 
+  return sanitizeSentryAuthLinks(event);
+}
+
+// Auth URLs also appear in navigation breadcrumbs, span descriptions and
+// http.query/url.full attributes. Scrub these before any telemetry is sent.
+export function sanitizeSentryAuthLinks<T extends object>(event: T): T {
+  const visited = new WeakSet<object>();
+  function scrub(value: object) {
+    if (visited.has(value)) return;
+    visited.add(value);
+    for (const [key, child] of Object.entries(value)) {
+      const record = value as Record<string, unknown>;
+      if (typeof child === "string") {
+        record[key] = /^(token|token_hash|access_token|refresh_token|code)$/i.test(key)
+          ? "[Filtered]"
+          : child.replace(/(^|[?&])(token|token_hash|access_token|refresh_token|code)=[^&#\s]*/gi, "$1$2=[Filtered]");
+      } else if (child && typeof child === "object") {
+        scrub(child);
+      }
+    }
+  }
+  scrub(event);
   return event;
 }
 

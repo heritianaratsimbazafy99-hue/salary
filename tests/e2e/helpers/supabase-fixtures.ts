@@ -316,6 +316,16 @@ async function cleanupPayrollFixture(
   if (typeof employeeProfile.data?.id === "string") allProfileIds.push(employeeProfile.data.id);
   if (typeof employeeProfile.data?.auth_user_id === "string") {
     allAuthUserIds.push(employeeProfile.data.auth_user_id);
+  } else {
+    // Activation may fail after creating an unconfirmed Auth user but before its profile exists.
+    // Clean up this fixture's exact recipient as well, without touching other tests' users.
+    for (let page = 1; ; page += 1) {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) throw new Error(`Unable to find activation user during cleanup: ${error.message}`);
+      const user = data.users.find((candidate) => candidate.email === input.employeeEmail);
+      if (user) allAuthUserIds.push(user.id);
+      if (user || data.users.length < 1000) break;
+    }
   }
 
   await throwOnCleanupError(

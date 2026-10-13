@@ -19,6 +19,7 @@ const localSupabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? readSupabaseStatusValue("SERVICE_ROLE_KEY");
 const localResendApiKey = process.env.RESEND_API_KEY ?? ["re", "local_e2e_resend_key_placeholder"].join("_");
 const localResendFromEmail = process.env.RESEND_FROM_EMAIL ?? "MadajobPay <no-reply@local.test>";
+const useProductionBuild = process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -33,8 +34,12 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile", use: { ...devices["Pixel 5"] } },
   ],
-  webServer: {
-    command: "npm run dev",
+  webServer: [{
+    command: "node tests/e2e/helpers/mail-server.mjs",
+    url: "http://127.0.0.1:55428/health",
+    reuseExistingServer: true,
+  }, {
+    command: useProductionBuild ? "npm run start" : "npm run dev",
     env: {
       ...inheritedEnv,
       NEXT_PUBLIC_APP_URL: localAppUrl,
@@ -42,11 +47,14 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_URL: localSupabaseUrl,
       RESEND_API_KEY: localResendApiKey,
       RESEND_FROM_EMAIL: localResendFromEmail,
+      RESEND_BASE_URL: "http://127.0.0.1:55428",
+      SENTRY_DSN: "",
+      NEXT_PUBLIC_SENTRY_DSN: "",
       ...(localSupabaseServiceRoleKey ? { SUPABASE_SERVICE_ROLE_KEY: localSupabaseServiceRoleKey } : {}),
     },
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
-  },
+    reuseExistingServer: !useProductionBuild,
+  }],
 });
 
 function readSupabaseStatusValue(key: string): string | undefined {

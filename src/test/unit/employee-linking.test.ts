@@ -1,6 +1,17 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const AGENCY_ID = "00000000-0000-0000-0000-000000000101";
+const EXISTING_INVITATION = {
+  id: "00000000-0000-0000-0000-000000000501",
+  email: "old@example.com",
+  employee_id: "EMP-001",
+  full_name: "Old Worker",
+  invited_by: "00000000-0000-0000-0000-000000000401",
+  token_hash: "existing-token-hash",
+  expires_at: "2026-06-01T00:00:00.000Z",
+  updated_at: "2026-05-18T00:00:00.000Z",
+};
 const INVITED_BY_PROFILE_ID = "00000000-0000-0000-0000-000000000401";
 
 type EmployeeProvisioningTestClient = {
@@ -78,6 +89,10 @@ describe("ensureEmployeeAuthProfile", () => {
       expect.anything(),
     );
     expect(result.profileId).toBeNull();
+    expect(result.invitationToken).toEqual(expect.any(String));
+    const payload = tableWithUpsert(client, "employee_invitations").upsert.mock.calls[0][0];
+    expect(payload.token_hash).toBe(createHash("sha256").update(result.invitationToken!).digest("hex"));
+    expect(JSON.stringify(payload)).not.toContain(result.invitationToken);
   });
 
   it("does not bind an existing employee profile by email during publication", async () => {
@@ -130,9 +145,7 @@ describe("ensureEmployeeAuthProfile", () => {
 
   it("does not revoke a pre-existing pending invitation during publication rollback", async () => {
     const client = createEmployeeProvisioningClient({
-      existingInvitation: {
-        id: "00000000-0000-0000-0000-000000000501",
-      },
+      existingInvitation: EXISTING_INVITATION,
     });
 
     const { ensureEmployeeAuthProfile, rollbackEmployeeAuthProfileProvisioning } = await import(
@@ -155,20 +168,22 @@ describe("ensureEmployeeAuthProfile", () => {
       provisioned,
     );
 
-    expect(tableWithUpdate(client, "employee_invitations").update).not.toHaveBeenCalled();
+    const previousDetails = { ...EXISTING_INVITATION } as Record<string, unknown>;
+    delete previousDetails.id;
+    expect(tableWithUpdate(client, "employee_invitations").update).toHaveBeenCalledWith(previousDetails);
   });
 
-  it("keeps the existing pending invitation token hash during publication refresh", async () => {
+  it("rotates the existing pending invitation token hash and returns its matching token", async () => {
     const existingTokenHash = "existing-token-hash";
     const client = createEmployeeProvisioningClient({
       existingInvitation: {
-        id: "00000000-0000-0000-0000-000000000501",
+        ...EXISTING_INVITATION,
         token_hash: existingTokenHash,
       },
     });
 
     const { ensureEmployeeAuthProfile } = await import("@/lib/employees/linking");
-    await ensureEmployeeAuthProfile(
+    const result = await ensureEmployeeAuthProfile(
       {
         agencyId: AGENCY_ID,
         email: "worker@example.com",
@@ -179,9 +194,11 @@ describe("ensureEmployeeAuthProfile", () => {
       client as unknown as Parameters<typeof ensureEmployeeAuthProfile>[1],
     );
 
+    expect(result.invitationToken).toEqual(expect.any(String));
+    expect(result.invitationRollback?.tokenHash).not.toBe(existingTokenHash);
     expect(tableWithUpsert(client, "employee_invitations").upsert).not.toHaveBeenCalled();
     expect(tableWithUpdate(client, "employee_invitations").update).toHaveBeenCalledWith(
-      expect.not.objectContaining({ token_hash: expect.anything() }),
+      expect.objectContaining({ token_hash: createHash("sha256").update(result.invitationToken!).digest("hex") }),
     );
   });
 
@@ -479,14 +496,14 @@ function createEmployeeProvisioningClient(options: {
       })),
     })),
   }));
+  const employeeMutationQuery = {
+    eq: vi.fn(() => employeeMutationQuery),
+    is: vi.fn(async () => ({ error: null })),
+  };
   const employeesTable = {
-    delete: vi.fn(() => ({
-      eq: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
-    })),
+    delete: vi.fn(() => employeeMutationQuery),
     select: vi.fn(() => employeeSelectQuery),
-    update: vi.fn(() => ({
-      eq: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
-    })),
+    update: vi.fn(() => employeeMutationQuery),
     upsert: employeeUpsert,
   };
 
@@ -540,23 +557,29 @@ function createEmployeeProvisioningClient(options: {
       })),
     })),
   }));
-  const invitationUpdate = vi.fn((payload: Record<string, unknown>) => ({
-    eq: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(async () => ({
-            data: {
-              ...options.existingInvitation,
-              ...payload,
-              id: options.existingInvitation?.id ?? "00000000-0000-0000-0000-000000000501",
-            },
-            error: null,
-          })),
+  const invitationUpdate = vi.fn((payload: Record<string, unknown>) => {
+    const query = {
+      eq: vi.fn(() => query),
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn(async () => ({ data: { id: options.existingInvitation?.id ?? "new-invitation" }, error: null })),
+        single: vi.fn(async () => ({
+          data: {
+            ...options.existingInvitation,
+            ...payload,
+            id: options.existingInvitation?.id ?? "00000000-0000-0000-0000-000000000501",
+          },
+          error: null,
         })),
       })),
-    })),
-  }));
+    };
+    return query;
+  });
+  const invitationDeleteQuery = {
+    eq: vi.fn(() => invitationDeleteQuery),
+    select: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: { id: "new-invitation" }, error: null })) })),
+  };
   const employeeInvitationsTable = {
+    delete: vi.fn(() => invitationDeleteQuery),
     select: vi.fn(() => invitationSelectQuery),
     update: invitationUpdate,
     upsert: invitationUpsert,

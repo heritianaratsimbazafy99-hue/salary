@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ColumnMappingForm } from "@/components/imports/ColumnMappingForm";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { PayslipPreviewTable } from "@/components/imports/PayslipPreviewTable";
+import { ResendInvitationsButton } from "@/components/imports/ResendInvitationsButton";
 import { PublishImportButton } from "@/components/imports/PublishImportButton";
 import { UploadStepper } from "@/components/imports/UploadStepper";
 import { AccessDenied } from "@/components/shell/AccessDenied";
@@ -123,6 +124,8 @@ export default async function ImportDetailPage({ params }: PageProps) {
           actions={
             payrollImport.status === "READY_FOR_PREVIEW" ? (
               <PublishImportButton importId={payrollImport.id} />
+            ) : ["PUBLISHED", "SUPERSEDED"].includes(payrollImport.status) ? (
+              <ResendInvitationsButton importId={payrollImport.id} />
             ) : undefined
           }
         />

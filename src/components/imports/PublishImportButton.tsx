@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/Button";
 
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
+
 export function PublishImportButton({ importId }: { importId: string }) {
+  const isHydrated = useSyncExternalStore(subscribeToHydration, clientHydrationSnapshot, serverHydrationSnapshot);
   const [message, setMessage] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -44,7 +49,7 @@ export function PublishImportButton({ importId }: { importId: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button disabled={isPublishing} onClick={publishImport} type="button">
+      <Button disabled={!isHydrated || isPublishing} onClick={publishImport} type="button">
         {isPublishing ? "Publication" : "Publier"}
       </Button>
       {message ? (

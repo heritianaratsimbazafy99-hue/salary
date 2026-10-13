@@ -34,6 +34,20 @@ function createSupabaseClientWithUser(user: { id: string } | null, role: string 
 }
 
 describe("buildPayslipPublishedEmail", () => {
+  it("includes the personal activation link for an unlinked employee without payroll amounts", () => {
+    const email = buildPayslipPublishedEmail({
+      employeeName: "<Worker>",
+      appUrl: "https://salary.example.com/ignored-path",
+      invitationToken: "secret+token&value",
+    });
+    expect(email.html).toContain("&lt;Worker&gt;");
+    expect(email.html).toContain('href="https://salary.example.com/auth/invitation?token=secret%2Btoken%26value"');
+    expect(email.html).toContain("Activer mon espace salarié");
+    expect(email.html).toContain("14 jours");
+    expect(email.html).not.toContain("/employee/payslips");
+    expect(email.html).not.toMatch(/\d+\s*MGA/);
+  });
+
   it("does not include payroll amounts", () => {
     const email = buildPayslipPublishedEmail({
       employeeName: "Employee One",
