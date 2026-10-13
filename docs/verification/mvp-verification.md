@@ -1,5 +1,7 @@
 # MVP Verification
 
+> Rapport historique de cette étape. L’activation et la correction des dépendances ont ensuite été déployées dans la release d6e21098. Pour la fermeture des parcours et les décisions d’exploitation, consulter `employee-opening-release-2026-10-13.md` et le runbook actualisé.
+
 ## Latest Local Evidence
 
 Verified on 2026-06-26 from branch `codex/payroll-platform`.

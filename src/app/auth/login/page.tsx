@@ -27,7 +27,7 @@ const LoginFormSchema = z.object({
 const LOGIN_MESSAGES = {
   callback_failed: {
     tone: "error",
-    text: "Le lien de connexion a expire ou n'est plus valide.",
+    text: "Le lien de connexion a expiré ou n’est plus valide.",
   },
   invalid_email: {
     tone: "error",
@@ -43,11 +43,11 @@ const LOGIN_MESSAGES = {
   },
   otp_failed: {
     tone: "error",
-    text: "Impossible d'envoyer le lien pour le moment.",
+    text: "Impossible d’envoyer le lien pour le moment.",
   },
   sent: {
     tone: "success",
-    text: "Lien envoye. Verifiez votre boite mail.",
+    text: "Lien envoyé. Vérifiez votre boîte mail.",
   },
 } as const;
 

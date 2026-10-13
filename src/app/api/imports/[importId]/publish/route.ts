@@ -1,3 +1,4 @@
+import { PublicationConfirmationSchema } from "@/lib/payroll/manager-review";
 import { apiError } from "@/lib/errors";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import { AUTH_REQUIRED_ERROR_MESSAGE, FORBIDDEN_ERROR_MESSAGE } from "@/lib/admin/permissions";
@@ -13,7 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function POST(_request: NextRequest, context: { params: Promise<{ importId: string }> }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ importId: string }> }) {
   const { importId } = await context.params;
   const normalizedImportId = importId.trim();
 
@@ -33,9 +34,12 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
   }
 
   try {
+    const confirmation = PublicationConfirmationSchema.safeParse(await request.json().catch(() => null));
+    if (!confirmation.success) return NextResponse.json(apiError("VALIDATION_ERROR", "Confirmez les destinataires avant de publier."), { status: 422 });
     const supabase = await createClient();
     const result = await publishPayrollImport({
       actor,
+      fingerprint: confirmation.data.fingerprint,
       createWriteSupabase: createAdminClient,
       importId: normalizedImportId,
       readSupabase: supabase,
@@ -78,7 +82,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
 
     if (error instanceof PublishConflictError) {
       return NextResponse.json(
-        apiError("CONFLICT", "Import is not ready for publication", { status: error.status }),
+        apiError("CONFLICT", "La revue est périmée ou l’import est déjà publié. Rechargez les destinataires.", { status: error.status }),
         { status: 409 },
       );
     }

@@ -20,6 +20,7 @@ export async function GET() {
       headers: {
         "content-disposition": `attachment; filename="${filename}"`,
         "content-type": "text/csv; charset=utf-8",
+        "cache-control": "private, no-store",
       },
     });
   } catch (error) {

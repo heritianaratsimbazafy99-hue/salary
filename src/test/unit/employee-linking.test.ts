@@ -83,7 +83,6 @@ describe("ensureEmployeeAuthProfile", () => {
         email: "worker@example.com",
         employee_id: "EMP-001",
         full_name: "Worker One",
-        is_active: true,
         profile_id: null,
       }),
       expect.anything(),
@@ -227,12 +226,23 @@ describe("ensureEmployeeAuthProfile", () => {
     expect(client.auth.admin.deleteUser).not.toHaveBeenCalled();
   });
 
+  it("refuses a disabled employee without provisioning or changing access", async () => {
+    const client = createEmployeeProvisioningClient({ existingEmployee: {
+      employee_id: "EMP-001", email: "worker@example.com", full_name: "Worker One", is_active: false, profile_id: null,
+    } });
+    const { ensureEmployeeAuthProfile } = await import("@/lib/employees/linking");
+    await expect(ensureEmployeeAuthProfile({ agencyId: AGENCY_ID, employeeId: "EMP-001", email: "worker@example.com", fullName: "Worker One", invitedByProfileId: INVITED_BY_PROFILE_ID }, client as unknown as Parameters<typeof ensureEmployeeAuthProfile>[1])).rejects.toThrow("désactivé");
+    expect(tableWithUpsert(client, "employees").upsert).not.toHaveBeenCalled();
+    expect(tableWithUpdate(client, "employees").update).not.toHaveBeenCalled();
+    expect(tableWithUpsert(client, "employee_invitations").upsert).not.toHaveBeenCalled();
+  });
+
   it("restores the previous employee row when invitation creation fails after refresh", async () => {
     const previousEmployee = {
       email: "old-worker@example.com",
       employee_id: "EMP-001",
       full_name: "Old Worker",
-      is_active: false,
+      is_active: true,
       profile_id: null,
     };
     const client = createEmployeeProvisioningClient({
@@ -259,7 +269,6 @@ describe("ensureEmployeeAuthProfile", () => {
       email: previousEmployee.email,
       employee_id: previousEmployee.employee_id,
       full_name: previousEmployee.full_name,
-      is_active: previousEmployee.is_active,
       profile_id: previousEmployee.profile_id,
     });
     expect(tableWithDelete(client, "profiles").delete).not.toHaveBeenCalled();
@@ -489,21 +498,23 @@ function createEmployeeProvisioningClient(options: {
           email: payload.email,
           employee_id: payload.employee_id,
           full_name: payload.full_name,
-          is_active: payload.is_active,
+          is_active: payload.is_active ?? true,
           profile_id: payload.profile_id,
         },
         error: null,
       })),
     })),
   }));
+  let employeeUpdatePayload: Record<string, unknown> = {};
   const employeeMutationQuery = {
     eq: vi.fn(() => employeeMutationQuery),
-    is: vi.fn(async () => ({ error: null })),
+    is: vi.fn(() => employeeMutationQuery),
+    select: vi.fn(() => ({ single: vi.fn(async () => ({ data: { ...options.existingEmployee, ...employeeUpdatePayload }, error: null })) })),
   };
   const employeesTable = {
     delete: vi.fn(() => employeeMutationQuery),
     select: vi.fn(() => employeeSelectQuery),
-    update: vi.fn(() => employeeMutationQuery),
+    update: vi.fn((payload: Record<string, unknown>) => { employeeUpdatePayload = payload; return employeeMutationQuery; }),
     upsert: employeeUpsert,
   };
 

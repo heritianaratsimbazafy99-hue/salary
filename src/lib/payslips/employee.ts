@@ -87,6 +87,7 @@ export async function loadEmployeePayslips(
     .from("payslips")
     .select(EMPLOYEE_PAYSLIP_COLUMNS)
     .not("current_version_id", "is", null)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .eq("employee.profile_id", profile.id)
     .order("period_start", { ascending: false })
     .order("published_at", { ascending: false });

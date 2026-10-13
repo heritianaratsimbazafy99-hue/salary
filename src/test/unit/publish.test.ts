@@ -145,6 +145,7 @@ function createTableQuery(db: PublishTestDb, table: keyof PublishTestDb) {
       }
 
       const insertedRow = {
+        ...(table === "employees" ? { is_active: true } : {}),
         ...payload,
         id: payload.id ?? generatedIdFor(table, db[table].length + 1),
       };
@@ -199,6 +200,7 @@ function createMutationResult(rows: PublishTableRow[]) {
 }
 
 function createSelectQuery(rows: PublishTableRow[]) {
+  let offset = 0; let end = 999;
   const filters: Array<(row: PublishTableRow) => boolean> = [];
 
   const query = {
@@ -210,6 +212,8 @@ function createSelectQuery(rows: PublishTableRow[]) {
       filters.push((row) => values.includes(row[column]));
       return query;
     },
+    order() { return query; },
+    range(start: number, last: number) { offset = start; end = last; return query; },
     maybeSingle: async () => ({ data: filteredRows()[0] ? { ...filteredRows()[0] } : null, error: null }),
     single: async () => {
       const row = filteredRows()[0];
@@ -224,7 +228,7 @@ function createSelectQuery(rows: PublishTableRow[]) {
   };
 
   function filteredRows() {
-    return rows.filter((row) => filters.every((filter) => filter(row)));
+    return rows.filter((row) => filters.every((filter) => filter(row))).slice(offset, end + 1);
   }
 
   return query;
@@ -288,7 +292,7 @@ function createAuthorizedPublishClient(options: {
 }
 
 function createPublishRequest() {
-  return {} as NextRequest;
+  return new Request("http://localhost/api/imports/test/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmed: true, fingerprint: "a".repeat(32) }) }) as NextRequest;
 }
 
 function createAdminPublishClient(db: PublishTestDb) {
@@ -508,7 +512,8 @@ describe("POST /api/imports/:importId/publish", () => {
         status: "PUBLISHED",
       },
     });
-    expect(adminClient.rpc).toHaveBeenCalledWith("publish_payroll_import", {
+    expect(adminClient.rpc).toHaveBeenCalledWith("publish_payroll_import_reviewed", {
+      p_fingerprint: "a".repeat(32),
       p_actor_agency_id: AGENCY_ID,
       p_actor_profile_id: ACTOR_PROFILE_ID,
       p_import_id: IMPORT_ID,
@@ -556,6 +561,70 @@ describe("POST /api/imports/:importId/publish", () => {
       status: "SENT",
     });
     expect(db.notifications[0].sent_at).toEqual(expect.any(String));
+  });
+
+  it.each(["activation", "deactivation"])("preserves a concurrent employee %s during access preparation", async (change) => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({ agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001", employee_name: "Employee One", import_id: IMPORT_ID });
+    db.employees.push({ agency_id: AGENCY_ID, email: "employee@example.com", employee_id: "EMP-001", full_name: "Employee One", is_active: true, profile_id: null });
+    seedPublishedNotification(db);
+    const adminClient = createAdminPublishClient(db);
+    adminClient.from.mockImplementation((table) => {
+      const query = createTableQuery(db, table);
+      if (table === "employees") {
+        const update = query.update;
+        query.update = (payload) => {
+          if (change === "activation") db.employees[0].profile_id = "activated-concurrently";
+          else db.employees[0].is_active = false;
+          return update(payload);
+        };
+      }
+      return query;
+    });
+    adminMocks.createAdminClient.mockReturnValue(adminClient);
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+    expect(response.status).toBe(200);
+    expect(db.employees[0]).toMatchObject(change === "activation" ? { profile_id: "activated-concurrently" } : { is_active: false });
+    expect(db.employee_invitations).toHaveLength(0);
+    expect(notificationMocks.sendPayslipPublishedEmail).not.toHaveBeenCalled();
+    expect(db.notifications[0].status).toBe("FAILED");
+  });
+
+  it("provisions the committed reviewed identity, even when it changes before the RPC", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    db.payroll_import_rows.push({ agency_id: AGENCY_ID, employee_email: "old@example.com", employee_id: "EMP-001", employee_name: "Old Worker", import_id: IMPORT_ID });
+    seedPublishedNotification(db, { recipientEmail: "reviewed@example.com" });
+    const adminClient = createAdminPublishClient(db);
+    const committed = await adminClient.rpc();
+    adminClient.rpc.mockClear();
+    adminClient.rpc.mockImplementationOnce(async () => {
+      Object.assign(db.payroll_import_rows[0], { employee_email: "reviewed@example.com", employee_name: "Reviewed Worker" });
+      return committed;
+    });
+    adminMocks.createAdminClient.mockReturnValue(adminClient);
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+    expect(response.status).toBe(200);
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "reviewed@example.com", employeeName: "Reviewed Worker" }));
+    expect(db.employees[0].email).toBe("reviewed@example.com");
+  });
+
+  it("delivers every notification for an import larger than the API page size", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    for (let index = 0; index < 1001; index += 1) {
+      const employeeId = `EMP-${index}`;
+      const email = `worker-${index}@example.com`;
+      db.payroll_import_rows.push({ id: `row-${index}`, agency_id: AGENCY_ID, employee_email: email, employee_id: employeeId, employee_name: employeeId, import_id: IMPORT_ID });
+      db.employees.push({ agency_id: AGENCY_ID, email, employee_id: employeeId, full_name: employeeId, is_active: true, profile_id: `profile-${index}` });
+      seedPublishedNotification(db, { payslipId: `payslip-${index}`, notificationId: `notification-${index}`, recipientEmail: email });
+    }
+    adminMocks.createAdminClient.mockReturnValue(createAdminPublishClient(db));
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+    expect(response.status).toBe(200);
+    expect(notificationMocks.sendPayslipPublishedEmail).toHaveBeenCalledTimes(1001);
+    expect(db.notifications.every((notification) => notification.status === "SENT")).toBe(true);
   });
 
   it("marks notification delivery failures without failing publication", async () => {
@@ -647,7 +716,7 @@ describe("POST /api/imports/:importId/publish", () => {
     expect(JSON.stringify(auditMocks.recordAuditEvent.mock.calls)).not.toContain(token);
   });
 
-  it.each([false, true])("restores an earlier invitation after failed publication unless it has since rotated: %s", async (concurrentRotation) => {
+  it.each([false, true])("does not rotate an invitation before commit and preserves concurrent rotation: %s", async (concurrentRotation) => {
     const { db } = createAuthorizedPublishClient();
     seedPublishImport(db);
     db.payroll_import_rows.push({
@@ -663,7 +732,7 @@ describe("POST /api/imports/:importId/publish", () => {
     db.employee_invitations.push({ ...previousInvitation });
     const adminClient = createAdminPublishClient(db);
     adminClient.rpc.mockImplementationOnce(async () => {
-      expect(db.employee_invitations[0].token_hash).not.toBe(previousInvitation.token_hash);
+      expect(db.employee_invitations[0].token_hash).toBe(previousInvitation.token_hash);
       if (concurrentRotation) db.employee_invitations[0].token_hash = "concurrently-rotated";
       return { data: null, error: { message: "transaction failed" } };
     });
@@ -687,6 +756,8 @@ describe("POST /api/imports/:importId/publish", () => {
       agency_id: AGENCY_ID, employee_email: "employee@example.com", employee_id: "EMP-001",
       employee_name: "Employee One", import_id: IMPORT_ID,
     });
+    db.employees.push({ agency_id: AGENCY_ID, employee_id: "EMP-001", email: "employee@example.com", full_name: "Employee One", is_active: true, profile_id: null });
+    db.employee_invitations.push({ id: "pending", status: "PENDING" });
     const adminClient = createAdminPublishClient(db);
     adminClient.rpc.mockImplementationOnce(async () => {
       db.employees[0].profile_id = "activated-profile";
@@ -700,6 +771,17 @@ describe("POST /api/imports/:importId/publish", () => {
     expect(response.status).toBe(500);
     expect(db.employees[0].profile_id).toBe("activated-profile");
     expect(db.employee_invitations[0].status).toBe("ACCEPTED");
+  });
+
+  it("returns 409 for an application conflict without a PostgreSQL serialization retry", async () => {
+    const { db } = createAuthorizedPublishClient();
+    seedPublishImport(db);
+    const adminClient = createAdminPublishClient(db);
+    adminClient.rpc.mockResolvedValueOnce({ data: null, error: { code: "PT409", message: "La revue est périmée." } });
+    adminMocks.createAdminClient.mockReturnValue(adminClient);
+    const response = await POST(createPublishRequest(), createPublishContext(IMPORT_ID));
+    expect(response.status).toBe(409);
+    expect(notificationMocks.sendPayslipPublishedEmail).not.toHaveBeenCalled();
   });
 
   it("returns 500 and does not audit when the transactional publish RPC fails", async () => {

@@ -75,20 +75,20 @@ Rules:
 Smoke check after deployment:
 
 1. Confirm the deployment environment contains the Sentry variables above.
-2. Trigger a controlled test exception from a non-sensitive test path or staging preview.
+2. As superadmin, trigger the fixed controlled event from `/hr/operations` on the verified production deployment.
 3. Confirm the event appears in Sentry under project `salary`.
-4. Resolve or delete the test issue after the smoke check.
+4. Confirm the alert reaches heritiana.ratsimbazafy99@gmail.com, then resolve the test issue.
 
 ## Database
 
 - Supabase migrations must pass from an empty local reset.
 - Supabase advisors must pass with `--fail-on error`.
-- Restore drill must be completed using `docs/operations/supabase-backup-restore.md`.
+- Owner exception dated 2026-10-13: backups and the managed restore drill are explicitly deferred; no paid upgrade. Keep `docs/operations/supabase-backup-restore.md` for later implementation.
 - Production writes should be paused before any destructive restore.
 
 ## Email Delivery
 
-- Resend application delivery must be configured in Vercel Production and Preview with `RESEND_API_KEY` and `RESEND_FROM_EMAIL`.
+- Resend application delivery must be configured in Vercel Production with `RESEND_API_KEY` and `RESEND_FROM_EMAIL`.
 - The sender domain must be verified in Resend before go-live.
 - Supabase Auth must use custom SMTP for magic links and auth emails:
   - host: `smtp.resend.com`;
@@ -109,4 +109,4 @@ Smoke check after deployment:
 
 ## Current Exclusions
 
-There are no intentional functional launch exclusions. If Resend sender-domain verification or Supabase Auth SMTP configuration is missing, launch is blocked until that external configuration is complete.
+Backups are intentionally deferred by the owner (2026-10-13). If Resend sender-domain verification or Supabase Auth SMTP configuration is missing, launch is blocked until that external configuration is complete.

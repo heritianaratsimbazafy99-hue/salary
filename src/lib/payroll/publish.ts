@@ -4,7 +4,6 @@ import type { AgencyScopedActor } from "@/lib/admin/auth";
 import { assertCanManagePayrollForAgency } from "@/lib/admin/permissions";
 import {
   ensureEmployeeAuthProfile,
-  rollbackEmployeeAuthProfileProvisioning,
   type ProvisionedEmployeeAuthProfile,
 } from "@/lib/employees/linking";
 import { sendPayslipPublishedEmail } from "@/lib/notifications/resend-server";
@@ -76,6 +75,7 @@ export async function publishPayrollImport(input: {
   createWriteSupabase: () => SupabasePublishClient;
   importId: string;
   readSupabase: SupabaseReadClient;
+  fingerprint: string;
   sendPayslipEmail?: typeof sendPayslipPublishedEmail;
 }): Promise<PublishImportResult> {
   const payrollImport = await loadPayrollImport(input.readSupabase, input.importId);
@@ -90,45 +90,38 @@ export async function publishPayrollImport(input: {
     throw new PublishConflictError(payrollImport.status);
   }
 
-  const employeeIdentities = await loadPayrollImportEmployeeIdentities(input.readSupabase, {
-    agencyId: payrollImport.agencyId,
-    importId: input.importId,
-  });
   const writeSupabase = input.createWriteSupabase();
   const provisionedEmployees: ProvisionedEmployeeAuthProfile[] = [];
 
-  try {
-    for (const employee of employeeIdentities) {
-      provisionedEmployees.push(
-        await ensureEmployeeAuthProfile(
-          {
-            agencyId: payrollImport.agencyId,
-            email: employee.email,
-            employeeId: employee.employeeId,
-            fullName: employee.fullName,
-            invitedByProfileId: input.actor.id,
-          },
-          writeSupabase,
-        ),
-      );
-    }
-  } catch (error) {
-    await rollbackProvisionedEmployees(writeSupabase, provisionedEmployees);
-    throw error;
-  }
-
-  const { data, error } = await writeSupabase.rpc("publish_payroll_import", {
+  // Commit the reviewed snapshot before creating invitations or sending messages.
+  const { data, error } = await writeSupabase.rpc("publish_payroll_import_reviewed", {
     p_actor_agency_id: payrollImport.agencyId,
     p_actor_profile_id: input.actor.id,
     p_import_id: input.importId,
+    p_fingerprint: input.fingerprint,
   });
-
   if (error) {
-    await rollbackProvisionedEmployees(writeSupabase, provisionedEmployees);
+    if (error.code === "40001" || error.code === "PT409" || error.code === "P0001") throw new PublishConflictError("STALE_REVIEW");
     throw new Error("Impossible de publier l'import.");
   }
-
   const result = parsePublishRpcRecord(data);
+  // Published rows are immutable. Read them only after the reviewed transaction
+  // commits so a concurrent correction cannot leave provisioning on an older state.
+  const employeeIdentities = await loadPayrollImportEmployeeIdentities(writeSupabase, {
+    agencyId: result.agencyId,
+    importId: input.importId,
+  });
+  for (const employee of employeeIdentities) {
+    try {
+      provisionedEmployees.push(await ensureEmployeeAuthProfile({
+        agencyId: payrollImport.agencyId, email: employee.email,
+        employeeId: employee.employeeId, fullName: employee.fullName,
+        invitedByProfileId: input.actor.id,
+      }, writeSupabase));
+    } catch {
+      // Notification remains tracked as FAILED below and may be retried by a manager.
+    }
+  }
   const emailResult = await sendPayslipPublishedNotifications({
     agencyId: result.agencyId,
     provisionedEmployees,
@@ -172,6 +165,7 @@ async function sendPayslipPublishedNotifications(input: {
     const employeeName = employee?.fullName ?? "Salarie";
 
     try {
+      if (!employee) throw new Error("Préparation de l’accès salarié impossible.");
       const response = await input.sendPayslipEmail({
         employeeName,
         ...(employee?.invitationToken ? { invitationToken: employee.invitationToken } : {}),
@@ -207,32 +201,33 @@ async function loadPublishedPayslipNotifications(
   supabase: SupabasePublishClient,
   input: { agencyId: string; importId: string },
 ) {
-  const { data: versions, error: versionsError } = await supabase
-    .from("payslip_versions")
-    .select("payslip_id")
-    .eq("agency_id", input.agencyId)
-    .eq("import_id", input.importId);
-
-  if (versionsError) {
-    throw new Error("Impossible de charger les bulletins publies pour notification.");
+  const payslipIds: string[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data: versions, error } = await supabase.from("payslip_versions")
+      .select("payslip_id").eq("agency_id", input.agencyId).eq("import_id", input.importId)
+      .order("id").range(offset, offset + 499);
+    if (error) throw new Error("Impossible de charger les bulletins publiés pour notification.");
+    payslipIds.push(...((versions ?? []) as PayslipVersionRecord[]).flatMap((version) =>
+      typeof version.payslip_id === "string" ? [version.payslip_id] : [],
+    ));
+    if (!versions || versions.length < 500) break;
   }
 
-  const payslipIds = ((versions ?? []) as PayslipVersionRecord[]).flatMap((version) =>
-    typeof version.payslip_id === "string" ? [version.payslip_id] : [],
-  );
-
-  if (payslipIds.length === 0) return [];
-
-  const { data: notifications, error: notificationsError } = await supabase
-    .from("notifications")
-    .select("id,recipient_email,resource_id")
-    .eq("notification_type", "PAYSLIP_PUBLISHED")
-    .eq("resource_type", "payslip")
-    .eq("status", "PENDING")
-    .in("resource_id", payslipIds);
-
-  if (notificationsError) {
-    throw new Error("Impossible de charger les notifications a envoyer.");
+  const notifications: NotificationRecord[] = [];
+  // Keep IN filters bounded as well as result pages: a large import otherwise
+  // exceeds URL limits even when the database result is paginated.
+  const uniquePayslipIds = [...new Set(payslipIds)];
+  for (let start = 0; start < uniquePayslipIds.length; start += 100) {
+    for (let offset = 0; ; offset += 500) {
+      const { data: batch, error } = await supabase.from("notifications")
+        .select("id,recipient_email,resource_id")
+        .eq("notification_type", "PAYSLIP_PUBLISHED").eq("resource_type", "payslip")
+        .eq("status", "PENDING").in("resource_id", uniquePayslipIds.slice(start, start + 100))
+        .order("id").range(offset, offset + 499);
+      if (error) throw new Error("Impossible de charger les notifications à envoyer.");
+      notifications.push(...(batch ?? []));
+      if (!batch || batch.length < 500) break;
+    }
   }
 
   return ((notifications ?? []) as NotificationRecord[]).flatMap((notification) => {
@@ -308,17 +303,6 @@ function safeFailureReason(error: unknown) {
   return "Email delivery failed.";
 }
 
-async function rollbackProvisionedEmployees(
-  admin: SupabasePublishClient,
-  provisionedEmployees: ProvisionedEmployeeAuthProfile[],
-) {
-  await Promise.allSettled(
-    provisionedEmployees.map((employee) =>
-      rollbackEmployeeAuthProfileProvisioning(admin, employee),
-    ),
-  );
-}
-
 async function loadPayrollImport(supabase: SupabaseReadClient, importId: string) {
   const { data, error } = await supabase
     .from("payroll_imports")
@@ -352,14 +336,15 @@ async function loadPayrollImportEmployeeIdentities(
   supabase: SupabaseReadClient,
   input: { agencyId: string; importId: string },
 ) {
-  const { data, error } = await supabase
-    .from("payroll_import_rows")
-    .select("employee_id,employee_email,employee_name")
-    .eq("import_id", input.importId)
-    .eq("agency_id", input.agencyId);
-
-  if (error) {
-    throw new Error("Impossible de charger les salaries de l'import.");
+  const data: PayrollImportEmployeeRecord[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data: rows, error } = await supabase.from("payroll_import_rows")
+      .select("employee_id,employee_email,employee_name")
+      .eq("import_id", input.importId).eq("agency_id", input.agencyId)
+      .order("id").range(offset, offset + 499);
+    if (error) throw new Error("Impossible de charger les salariés de l'import.");
+    data.push(...(rows ?? []));
+    if (!rows || rows.length < 500) break;
   }
 
   return ((data ?? []) as PayrollImportEmployeeRecord[]).flatMap((row) => {

@@ -350,21 +350,32 @@ async function findUnknownEmployeeIds(
   const uniqueEmployeeIds = Array.from(new Set(employeeIds));
   if (uniqueEmployeeIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from("employees")
-    .select("employee_id")
-    .eq("agency_id", agencyId)
-    .in("employee_id", uniqueEmployeeIds);
-
-  if (error) {
-    throw new Error("Impossible de verifier les employes existants.");
+  const batches: string[][] = [];
+  let batch: string[] = [];
+  let encodedLength = 0;
+  for (const employeeId of uniqueEmployeeIds) {
+    const length = encodeURIComponent(JSON.stringify(employeeId)).length + 3;
+    if (batch.length && (batch.length >= 100 || encodedLength + length > 4000)) {
+      batches.push(batch);
+      batch = [];
+      encodedLength = 0;
+    }
+    batch.push(employeeId);
+    encodedLength += length;
   }
+  if (batch.length) batches.push(batch);
 
-  const knownEmployeeIds = new Set(
-    ((data ?? []) as EmployeeRecord[])
-      .map((employee) => employee.employee_id)
-      .filter((employeeId): employeeId is string => typeof employeeId === "string"),
-  );
+  const knownEmployeeIds = new Set<string>();
+  // Bound both URL size and returned rows. A single IN(2000 IDs) exceeds the
+  // gateway's request-line limit; an unbounded response may also be truncated.
+  for (const ids of batches) {
+    const { data, error } = await supabase.from("employees")
+      .select("employee_id").eq("agency_id", agencyId).in("employee_id", ids);
+    if (error) throw new Error("Impossible de verifier les employes existants.");
+    for (const employee of (data ?? []) as EmployeeRecord[]) {
+      if (typeof employee.employee_id === "string") knownEmployeeIds.add(employee.employee_id);
+    }
+  }
 
   return uniqueEmployeeIds.filter((employeeId) => !knownEmployeeIds.has(employeeId));
 }

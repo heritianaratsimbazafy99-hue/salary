@@ -21,6 +21,8 @@
 
 ## Renderer Decision
 
+Decision du 13 octobre 2026 : `pdf-lib@1.17.1`, rendu serveur Node.js sans navigateur, PDF multi-fiches RH limité à 100 fiches (500 pages maximum). Police Helvetica intégrée ; accents français pris en charge, erreur explicite pour les caractères hors WinAnsi, sans substitution silencieuse. Les PDF sont des fiches internes, pas des bulletins légaux. CSV/XLSX : maximum 5 000 lignes, pagination par lots de 500. Format et filtres consignés dans `audit_logs` ; période également stockée dans `export_jobs`.
+
 Make the renderer decision before implementation:
 
 - Prefer `@react-pdf/renderer` if the team wants React-authored payslip layouts and can accept the dependency size.

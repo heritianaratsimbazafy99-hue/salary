@@ -11,7 +11,7 @@ import { apiError } from "@/lib/errors";
 import { persistPayrollImport } from "@/lib/payroll/import-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 const EXCEL_XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const EXCEL_COMPATIBLE_MIME_TYPES = new Set([EXCEL_XLSX_MIME_TYPE, "application/zip"]);
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (file.size > MAX_UPLOAD_BYTES) {
-    return NextResponse.json(apiError("VALIDATION_ERROR", "File exceeds 10 MB limit"), {
+    return NextResponse.json(apiError("VALIDATION_ERROR", "Le fichier dépasse la limite de 4 Mo"), {
       status: 422,
     });
   }

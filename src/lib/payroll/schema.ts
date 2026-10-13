@@ -37,7 +37,7 @@ export const PAY_ITEM_CATEGORIES = [
 export type PayItemCategory = (typeof PAY_ITEM_CATEGORIES)[number];
 
 export const PayrollRowSchema = z.object({
-  employeeId: z.string().min(1),
+  employeeId: z.string().min(1).max(80),
   email: z.email(),
   periodStart: z.iso.date(),
   periodEnd: z.iso.date(),

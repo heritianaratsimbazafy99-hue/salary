@@ -1,0 +1,16 @@
+@media print {
+  .shell {
+    min-height: auto;
+    background: white;
+    color: black;
+  }
+
+  .chrome {
+    display: none !important;
+  }
+
+  .content {
+    max-width: none;
+    padding: 0;
+  }
+}

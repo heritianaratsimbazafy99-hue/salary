@@ -1,3 +1,4 @@
+import { ExportDownload } from "@/components/exports/ExportDownload";
 import { notFound, redirect } from "next/navigation";
 
 import { ColumnMappingForm } from "@/components/imports/ColumnMappingForm";
@@ -50,6 +51,7 @@ type ImportRowRecord = {
   id?: unknown;
   normalized_data?: unknown;
   raw_unknown_columns?: unknown;
+  updated_at?: unknown;
 };
 
 type ImportDetail = {
@@ -71,6 +73,8 @@ type ImportReportError = {
 };
 
 type PreviewRow = {
+  updatedAt?: string;
+  notes?: string;
   deductionsTotal: number;
   employeeId: string;
   employeeName: string;
@@ -158,7 +162,8 @@ export default async function ImportDetailPage({ params }: PageProps) {
               Apercu des lignes valides rattachees a cet import.
             </p>
           </div>
-          <PayslipPreviewTable rows={previewRows} />
+          <ExportDownload agencyId={payrollImport.agencyId} importId={payrollImport.id} exportType="IMPORT_REPORT" />
+          <PayslipPreviewTable rows={previewRows} importId={payrollImport.status === "READY_FOR_PREVIEW" ? payrollImport.id : undefined} />
         </section>
       </div>
     </AppShell>
@@ -288,30 +293,18 @@ async function loadPayrollImportRows(
   supabase: { from: (table: string) => unknown },
   input: { agencyId: string; importId: string },
 ): Promise<PreviewRow[]> {
-  const query = supabase.from("payroll_import_rows") as {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        eq: (
-          column: string,
-          value: string,
-        ) => {
-          order: (
-            column: string,
-            options: { ascending: boolean },
-          ) => { limit: (count: number) => Promise<{ data: unknown; error: unknown }> };
-        };
-      };
-    };
-  };
-  const { data, error } = await query
-    .select("id,employee_id,employee_name,normalized_data,has_manual_adjustments,raw_unknown_columns")
-    .eq("import_id", input.importId)
-    .eq("agency_id", input.agencyId)
-    .order("employee_name", { ascending: true })
-    .limit(100);
-
-  if (error) {
-    throw new Error("Impossible de charger les lignes d'import.");
+  type RowQuery = { select: (columns: string) => RowQuery; eq: (column: string, value: string) => RowQuery; order: (column: string, options: { ascending: boolean }) => RowQuery; range: (start: number, end: number) => Promise<{ data: ImportRowRecord[] | null; error: unknown }> };
+  const data: ImportRowRecord[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const query = supabase.from("payroll_import_rows") as RowQuery;
+    const { data: batch, error } = await query
+      .select("id,employee_id,employee_name,normalized_data,has_manual_adjustments,raw_unknown_columns,updated_at")
+      .eq("import_id", input.importId).eq("agency_id", input.agencyId)
+      .order("employee_name", { ascending: true }).order("id", { ascending: true })
+      .range(offset, offset + 499);
+    if (error) throw new Error("Impossible de charger les lignes d'import.");
+    data.push(...(batch ?? []));
+    if (!batch || batch.length < 500) break;
   }
 
   return ((data ?? []) as ImportRowRecord[]).flatMap((row): PreviewRow[] => {
@@ -327,6 +320,8 @@ async function loadPayrollImportRows(
 
     return [
       {
+        updatedAt: typeof row.updated_at === "string" ? row.updated_at : undefined,
+        notes: typeof normalizedData.notes === "string" ? normalizedData.notes : undefined,
         deductionsTotal: toCount(normalizedData.deductionsTotal),
         employeeId: row.employee_id,
         employeeName: row.employee_name,

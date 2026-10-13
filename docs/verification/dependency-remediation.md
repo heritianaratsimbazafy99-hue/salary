@@ -1,5 +1,7 @@
 # Dependency remediation — 2026-10-13
 
+> Rapport historique de cette étape. L’activation et la correction des dépendances ont ensuite été déployées dans la release d6e21098. Pour la fermeture des parcours et les décisions d’exploitation, consulter `employee-opening-release-2026-10-13.md` et le runbook actualisé.
+
 The npm audit decreased from **21 affected packages** (6 moderate, 14 high,
 1 critical) to **0 vulnerabilities at every severity**, including development
 dependencies. No advisory was allowlisted or suppressed. No production deployment

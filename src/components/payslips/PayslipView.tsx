@@ -1,4 +1,5 @@
 import { ArrowDownRight, BadgeCheck, Wallet } from "lucide-react";
+import styles from "./PayslipView.module.css";
 
 type PayItemBase = {
   id: string;
@@ -27,7 +28,7 @@ export function PayslipView({
   payItems,
 }: Props) {
   return (
-    <article className="animate-rise overflow-hidden rounded-3xl border border-border bg-surface shadow-[var(--shadow-md)]">
+    <article aria-label={`Fiche de paie ${periodLabel}`} className={`${styles.document} animate-rise overflow-hidden rounded-3xl border border-border bg-surface shadow-[var(--shadow-md)]`}>
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-surface-elevated px-6 py-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -35,6 +36,7 @@ export function PayslipView({
           </p>
           <h2 className="mt-1 font-display text-xl font-bold tracking-tight">{employeeName}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">{periodLabel}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Fiche interne · Montants en ariary (MGA)</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/12 px-3 py-1 text-xs font-bold text-success">
           <BadgeCheck className="size-3.5" aria-hidden="true" />

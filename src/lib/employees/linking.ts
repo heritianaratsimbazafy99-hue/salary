@@ -195,6 +195,7 @@ export async function ensureEmployeeAuthProfile(
 
   const identity = normalizeEmployeeIdentity(parsedInput.data);
   const previousEmployee = await findExistingEmployee(admin, identity);
+  if (previousEmployee?.isActive === false) throw new Error("Ce salarié est désactivé. Une réactivation RH est nécessaire.");
   const profileId = previousEmployee?.profileId ?? null;
   const employeeRollback = {
     identity,
@@ -204,6 +205,7 @@ export async function ensureEmployeeAuthProfile(
   await upsertPublicationEmployee(admin, {
     identity,
     profileId,
+    exists: previousEmployee !== null,
   });
 
   let invitation: Awaited<ReturnType<typeof upsertPendingEmployeeInvitation>> | null = null;
@@ -277,7 +279,6 @@ export async function rollbackEmployeeAuthProfileProvisioning(
         email: rollback.previousEmployee.email,
         employee_id: rollback.previousEmployee.employeeId,
         full_name: rollback.previousEmployee.fullName,
-        is_active: rollback.previousEmployee.isActive,
         profile_id: rollback.previousEmployee.profileId,
       })
     : admin.from("employees").delete();
@@ -285,7 +286,8 @@ export async function rollbackEmployeeAuthProfileProvisioning(
     .eq("agency_id", rollback.identity.agencyId)
     .eq("employee_id", rollback.identity.employeeId)
     .eq("email", rollback.identity.email)
-    .eq("full_name", rollback.identity.fullName);
+    .eq("full_name", rollback.identity.fullName)
+    .eq("is_active", true);
 
   // An activation can finish between provisioning and a failed publication.
   // Never detach or delete the account linked by that activation.
@@ -336,23 +338,28 @@ async function findExistingEmployee(
 
 async function upsertPublicationEmployee(
   admin: EmployeeProvisioningAdminClient,
-  input: { identity: EmployeeIdentity; profileId: string | null },
+  input: { identity: EmployeeIdentity; profileId: string | null; exists: boolean },
 ) {
-  const { data, error } = await admin
-    .from("employees")
-    .upsert(
-      {
-        agency_id: input.identity.agencyId,
-        email: input.identity.email,
-        employee_id: input.identity.employeeId,
-        full_name: input.identity.fullName,
-        is_active: true,
-        profile_id: input.profileId,
-      },
-      { onConflict: "agency_id,employee_id" },
-    )
-    .select("employee_id,email,full_name,is_active,profile_id")
-    .single();
+  const payload = {
+    agency_id: input.identity.agencyId,
+    email: input.identity.email,
+    employee_id: input.identity.employeeId,
+    full_name: input.identity.fullName,
+    profile_id: input.profileId,
+  };
+  // Do not overwrite activation or deactivation that happened after the read.
+  let mutation;
+  if (input.exists) {
+    const query = admin.from("employees").update(payload)
+      .eq("agency_id", input.identity.agencyId).eq("employee_id", input.identity.employeeId)
+      .eq("is_active", true);
+    mutation = input.profileId ? query.eq("profile_id", input.profileId) : query.is("profile_id", null);
+  } else {
+    mutation = admin.from("employees").upsert(payload, {
+      onConflict: "agency_id,employee_id", ignoreDuplicates: true,
+    });
+  }
+  const { data, error } = await mutation.select("employee_id,email,full_name,is_active,profile_id").single();
   const employee = data as EmployeeRecord | null;
   const employeeProfileId = typeof employee?.profile_id === "string" ? employee.profile_id : null;
 

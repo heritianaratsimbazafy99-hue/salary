@@ -44,6 +44,15 @@ test("manager publishes a payroll import and employee/HR can see it", async ({ p
     await expect(page.getByRole("button", { name: "Publier" })).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: "Publier" }).click();
+    const publicationReview = page.getByRole("dialog", { name: "Vérifier avant publication" });
+    await expect(publicationReview.getByText(fixture.employeeEmail, { exact: true })).toBeVisible();
+    await expect(publicationReview.getByRole("button", { name: "Confirmer la publication", exact: true })).toBeDisabled();
+    await publicationReview.getByRole("checkbox", { name: "Je confirme les destinataires et la publication de toutes les fiches valides." }).check();
+    const publicationResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/imports/${importId}/publish`) && response.request().method() === "POST",
+    );
+    await publicationReview.getByRole("button", { name: "Confirmer la publication", exact: true }).click();
+    expect((await publicationResponse).status()).toBe(200);
     await expect(page.locator('[aria-current="step"]').filter({ hasText: "Publication" })).toBeVisible({
       timeout: 15_000,
     });
@@ -102,7 +111,10 @@ test("manager publishes a payroll import and employee/HR can see it", async ({ p
 
     await page.goto(appUrl("/hr/audit"));
     await expect(page.getByRole("heading", { name: "Journal d'audit" })).toBeVisible();
-    await expect(page.getByText("PAYROLL_IMPORT_PUBLISHED")).toBeVisible();
+    await expect(page.getByText("PAYROLL_IMPORT_PUBLISHED", { exact: true }).first()).toBeVisible();
+    const ownAudit = await fixture.admin.from("audit_logs").select("id").eq("action", "PAYROLL_IMPORT_PUBLISHED").eq("resource_id", importId);
+    expect(ownAudit.error).toBeNull();
+    expect(ownAudit.data?.length).toBeGreaterThan(0);
   } finally {
     await fixture.cleanup();
   }
