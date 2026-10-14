@@ -31,6 +31,7 @@ export class EmailDeliveryError extends Error {
 function publishedMessage(input: SendPayslipPublishedEmailInput) {
   return {
     from: serverEnv.RESEND_FROM_EMAIL,
+    replyTo: serverEnv.RESEND_REPLY_TO_EMAIL,
     to: input.to,
     ...buildPayslipPublishedEmail({
       employeeName: input.employeeName,
@@ -60,7 +61,7 @@ export async function sendPayslipPublishedEmail(input: SendPayslipPublishedEmail
 export async function sendEmployeeActivationEmail(input: { to: string; confirmationUrl: string }) {
   const email = buildEmployeeActivationEmail({ confirmationUrl: input.confirmationUrl });
   const resend = client();
-  const message = { from: serverEnv.RESEND_FROM_EMAIL, to: input.to, ...email };
+  const message = { from: serverEnv.RESEND_FROM_EMAIL, replyTo: serverEnv.RESEND_REPLY_TO_EMAIL, to: input.to, ...email };
   const idempotencyKey = requestKey("activation", message);
   return sendWithRetry(() => resend.emails.send(message, requestOptions(idempotencyKey)));
 }
@@ -147,7 +148,7 @@ export type HrNotificationEmail = {
 export async function sendHrNotificationEmail(input: HrNotificationEmail) {
   const resend = client();
   const message = {
-    from: serverEnv.RESEND_FROM_EMAIL, to: input.to, subject: input.subject, html: input.html,
+    from: serverEnv.RESEND_FROM_EMAIL, replyTo: serverEnv.RESEND_REPLY_TO_EMAIL, to: input.to, subject: input.subject, html: input.html,
     ...(input.attachments ? { attachments: input.attachments.map((file) => ({ filename: file.filename, content: Buffer.from(file.content, "utf8") })) } : {}),
   };
   return sendWithRetry(() => resend.emails.send(message, requestOptions(requestKey("hr-notification", input.idempotencyKey))));

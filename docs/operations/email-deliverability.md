@@ -51,3 +51,13 @@ Les recommandations de domaine et d'adresse de réponse nécessitent un choix de
 - [Resend — How to avoid Gmail's spam folder](https://resend.com/docs/knowledge-base/how-do-i-avoid-gmails-spam-folder) : cohérence des domaines et contenu simple.
 - [Resend — Why your emails are going to spam](https://resend.com/blog/why-your-emails-are-going-to-spam) : classement par le destinataire et diagnostic de réputation.
 - [Resend — Automatic plain text emails](https://resend.com/changelog/automatic-plain-text-emails) : génération automatique de la version texte.
+
+## Correction de l'adresse de réponse
+
+Le second contrôle en production a reçu une notification et une invitation dans Spam, avec SPF/DKIM/DMARC valides. Gmail affiche pour les deux : « Ce message est semblable à des messages identifiés comme spam par le passé. » Ce signal ne désigne pas un défaut d'authentification et ne permet pas d'isoler une cause unique.
+
+Tous les envois applicatifs Resend (paie, invitations, activation et RH, y compris les lots) utilisent maintenant `RESEND_REPLY_TO_EMAIL`, avec l'adresse de support publique comme valeur par défaut. Une valeur configurée doit être une adresse email valide. L'adresse affichée dans l'aide et le défaut de réponse partagent la même constante.
+
+La configuration d'expédition prévue est `MadajobPay <notifications@send.stark.mg>`, sur le domaine déjà authentifié. Les réponses sont dirigées vers la boîte de support suivie ; l'expéditeur ne prétend plus être une adresse sans réponse. Aucun changement SPF, DKIM, DMARC, suivi ou abonnement n'est nécessaire pour cette correction. Elle traite les recommandations observées dans Resend, sans prétendre garantir le classement Gmail.
+
+Après déploiement, vérifier les nouveaux messages individuels dans Gmail : From, Reply-To, SPF/DKIM/DMARC, origines des liens et labels INBOX/SPAM. Ne pas déplacer les messages pour valider le résultat.
