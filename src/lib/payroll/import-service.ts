@@ -45,6 +45,8 @@ type ColumnMappingRecord = {
 
 type EmployeeRecord = {
   employee_id?: unknown;
+  email?: unknown;
+  is_active?: unknown;
 };
 
 class PayrollImportParseError extends Error {}
@@ -97,21 +99,24 @@ export async function persistPayrollImport(input: {
   }
 
   const parseResult = parsePayrollRowsFromObjects(worksheetRows);
-  const periodValidationResult = validateRowsMatchImportPeriod(parseResult.validRows, {
+  const periodResult = validateRowsMatchImportPeriod(parseResult.validRows, {
     periodEnd: input.periodEnd,
     periodStart: input.periodStart,
   });
+  const identities = await loadEmployeeIdentities(input.supabase, input.agencyId, periodResult.validRows);
+  const identityResult = validateEmployeeIdentities(periodResult.validRows, identities);
+  const periodValidationResult = {
+    validRows: identityResult.validRows,
+    invalidRows: [...periodResult.invalidRows, ...identityResult.invalidRows],
+  };
   const hasValidRows = periodValidationResult.validRows.length > 0;
   const mappings = await loadColumnMappings(input.supabase, input.agencyId);
   const mappedColumns = new Set(mappings.map((mapping) => mapping.sourceColumn));
   const unmappedUnknownColumns = hasValidRows
     ? parseResult.unknownColumns.filter((column) => !mappedColumns.has(column))
     : [];
-  const unknownEmployeeIds = await findUnknownEmployeeIds(
-    input.supabase,
-    input.agencyId,
-    periodValidationResult.validRows.map((row) => row.data.employeeId),
-  );
+  const knownIds = new Set(identities.map((employee) => employee.employee_id));
+  const unknownEmployeeIds = [...new Set(periodValidationResult.validRows.map((row) => row.data.employeeId))].filter((id) => !knownIds.has(id));
   const status: PayrollImportStatus =
     !hasValidRows ? "FAILED" : unmappedUnknownColumns.length > 0 ? "NEEDS_MAPPING" : "READY_FOR_PREVIEW";
 
@@ -342,42 +347,61 @@ async function loadColumnMappings(
   });
 }
 
-async function findUnknownEmployeeIds(
-  supabase: SupabaseWriteClient,
-  agencyId: string,
-  employeeIds: string[],
-): Promise<string[]> {
-  const uniqueEmployeeIds = Array.from(new Set(employeeIds));
-  if (uniqueEmployeeIds.length === 0) return [];
+type ValidImportRow = ReturnType<typeof parsePayrollRowsFromObjects>["validRows"][number];
 
-  const batches: string[][] = [];
-  let batch: string[] = [];
-  let encodedLength = 0;
-  for (const employeeId of uniqueEmployeeIds) {
-    const length = encodeURIComponent(JSON.stringify(employeeId)).length + 3;
-    if (batch.length && (batch.length >= 100 || encodedLength + length > 4000)) {
-      batches.push(batch);
-      batch = [];
-      encodedLength = 0;
+async function loadEmployeeIdentities(supabase: SupabaseWriteClient, agencyId: string, rows: ValidImportRow[]): Promise<EmployeeRecord[]> {
+  const employees: EmployeeRecord[] = [];
+  for (const [column, values] of [
+    ["employee_id", rows.map((row) => row.data.employeeId)],
+    ["email", rows.map((row) => row.data.email)],
+  ] as const) {
+    const batches: string[][] = [];
+    let batch: string[] = [];
+    let encodedLength = 0;
+    for (const value of new Set(values)) {
+      const length = encodeURIComponent(JSON.stringify(value)).length + 3;
+      if (batch.length && (batch.length >= 100 || encodedLength + length > 4000)) {
+        batches.push(batch); batch = []; encodedLength = 0;
+      }
+      batch.push(value); encodedLength += length;
     }
-    batch.push(employeeId);
-    encodedLength += length;
-  }
-  if (batch.length) batches.push(batch);
-
-  const knownEmployeeIds = new Set<string>();
-  // Bound both URL size and returned rows. A single IN(2000 IDs) exceeds the
-  // gateway's request-line limit; an unbounded response may also be truncated.
-  for (const ids of batches) {
-    const { data, error } = await supabase.from("employees")
-      .select("employee_id").eq("agency_id", agencyId).in("employee_id", ids);
-    if (error) throw new Error("Impossible de verifier les employes existants.");
-    for (const employee of (data ?? []) as EmployeeRecord[]) {
-      if (typeof employee.employee_id === "string") knownEmployeeIds.add(employee.employee_id);
+    if (batch.length) batches.push(batch);
+    for (const values of batches) {
+      const { data, error } = await supabase.from("employees")
+        .select("employee_id,email,is_active").eq("agency_id", agencyId).in(column, values);
+      if (error) throw new Error("Impossible de vérifier les identités des salariés.");
+      employees.push(...((data ?? []) as EmployeeRecord[]));
     }
   }
+  return employees;
+}
 
-  return uniqueEmployeeIds.filter((employeeId) => !knownEmployeeIds.has(employeeId));
+export function validateEmployeeIdentities(rows: ValidImportRow[], employees: EmployeeRecord[]) {
+  const byId = new Map(employees.map((employee) => [employee.employee_id, employee]));
+  const byEmail = new Map(employees.filter((employee) => typeof employee.email === "string")
+    .map((employee) => [(employee.email as string).toLowerCase(), employee]));
+  const idCounts = new Map<string, number>();
+  const emailCounts = new Map<string, number>();
+  for (const row of rows) {
+    idCounts.set(row.data.employeeId, (idCounts.get(row.data.employeeId) ?? 0) + 1);
+    emailCounts.set(row.data.email, (emailCounts.get(row.data.email) ?? 0) + 1);
+  }
+  const validRows: ValidImportRow[] = [];
+  const invalidRows: ReturnType<typeof parsePayrollRowsFromObjects>["invalidRows"] = [];
+  for (const row of rows) {
+    const employee = byId.get(row.data.employeeId);
+    const emailOwner = byEmail.get(row.data.email);
+    const message = (idCounts.get(row.data.employeeId) ?? 0) > 1 ? "Matricule présent plusieurs fois dans le fichier. Conservez une seule ligne par salarié."
+      : (emailCounts.get(row.data.email) ?? 0) > 1 ? "Email présent sur plusieurs lignes. Vérifiez les identités des salariés."
+      : employee?.is_active === false ? "Salarié désactivé. Une réactivation RH est nécessaire avant un nouvel import."
+      : employee && typeof employee.email === "string" && employee.email.toLowerCase() !== row.data.email ? "Cet email diffère du dossier salarié. Faites vérifier son identité avant de réimporter."
+      : emailOwner && emailOwner.employee_id !== row.data.employeeId ? "Cet email appartient à un autre matricule de l’agence. Vérifiez le matricule avant de réimporter."
+      : null;
+    if (!message) validRows.push(row);
+    else invalidRows.push({ status: "invalid", rowNumber: row.rowNumber, raw: row.data,
+      errors: [{ fieldName: "employeeId", errorCode: "IDENTITY_CONFLICT", message, rawValue: row.data.employeeId }] });
+  }
+  return { validRows, invalidRows };
 }
 
 async function insertImportRecord(

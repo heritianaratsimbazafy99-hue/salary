@@ -1,4 +1,5 @@
 import "server-only";
+import { EmployeeIdSchema } from "@/lib/employees/identity";
 import { z } from "zod";
 import { getCurrentActor, requireCanManageHrReferential } from "../admin/auth";
 import { FORBIDDEN_ERROR_MESSAGE } from "../admin/permissions";
@@ -47,7 +48,7 @@ const contractCheck = (input: { contractType: string; contractStart: string; con
 const CONTRACT_MESSAGE = "Contrat invalide : un CDD exige une date de fin, postérieure au début.";
 const CreateInput = RecordFields.extend({
   agencyId: uuid,
-  matricule: z.string().trim().min(1).max(64),
+  matricule: EmployeeIdSchema,
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   fullName: z.string().trim().min(1).max(160),
 });

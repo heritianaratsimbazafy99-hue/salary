@@ -61,6 +61,7 @@ export type PublishImportResult = {
 type PublishRpcResult = Omit<PublishImportResult, "emailFailedCount" | "emailSentCount" | "notificationCount">;
 
 export class PublishNotFoundError extends Error {}
+export class PublishIdentityConflictError extends Error {}
 export class PublishConflictError extends Error {
   constructor(readonly status: string) {
     super("Import cannot be published from its current status.");
@@ -103,6 +104,7 @@ export async function publishPayrollImport(input: {
     p_fingerprint: input.fingerprint,
   });
   if (error) {
+    if (error.code === "PT422") throw new PublishIdentityConflictError(error.message);
     if (error.code === "40001" || error.code === "PT409" || error.code === "P0001") throw new PublishConflictError("STALE_REVIEW");
     throw new Error("Impossible de publier l'import.");
   }

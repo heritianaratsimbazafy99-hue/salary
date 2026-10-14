@@ -6,6 +6,7 @@ import { recordAuditEvent } from "@/lib/audit/server";
 import {
   PublishConflictError,
   PublishNotFoundError,
+  PublishIdentityConflictError,
   publishPayrollImport,
 } from "@/lib/payroll/publish";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -81,6 +82,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ im
   } catch (error) {
     const response = authErrorResponse(error);
     if (response) return response;
+
+    if (error instanceof PublishIdentityConflictError) {
+      return NextResponse.json(apiError("VALIDATION_ERROR", error.message, { reason: "IDENTITY_CONFLICT" }), { status: 422 });
+    }
 
     if (error instanceof PublishNotFoundError) {
       return NextResponse.json(apiError("NOT_FOUND", "Import not found"), { status: 404 });

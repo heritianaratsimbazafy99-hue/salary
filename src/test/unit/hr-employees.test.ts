@@ -43,7 +43,7 @@ describe("HR employee files", () => {
     const admin = adminClient();
     supabaseMocks.createAdminClient.mockReturnValue(admin);
     const { createEmployee } = await import("../../lib/hr/employees");
-    await expect(createEmployee({ ...record, agencyId: AGENCY, matricule: " M1 ", email: " A@Example.com ", fullName: " Aina " })).resolves.toBe(EMPLOYEE);
+    await expect(createEmployee({ ...record, agencyId: AGENCY, matricule: " m1 ", email: " A@Example.com ", fullName: " Aina " })).resolves.toBe(EMPLOYEE);
     expect(admin.rpc).toHaveBeenCalledWith("hr_create_employee", expect.objectContaining({
       p_matricule: "M1", p_email: "a@example.com", p_full_name: "Aina", p_job_title: "Conseiller", p_team_id: null, p_manager_profile_id: null, p_contract_end: null,
     }));

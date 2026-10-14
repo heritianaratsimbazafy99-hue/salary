@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EmployeeIdSchema } from "@/lib/employees/identity";
 
 export const PAYROLL_REQUIRED_COLUMNS = [
   "employee_id",
@@ -37,7 +38,7 @@ export const PAY_ITEM_CATEGORIES = [
 export type PayItemCategory = (typeof PAY_ITEM_CATEGORIES)[number];
 
 export const PayrollRowSchema = z.object({
-  employeeId: z.string().min(1).max(80),
+  employeeId: EmployeeIdSchema,
   email: z.email(),
   periodStart: z.iso.date(),
   periodEnd: z.iso.date(),

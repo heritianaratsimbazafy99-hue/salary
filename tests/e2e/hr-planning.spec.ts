@@ -25,7 +25,7 @@ test("manager approves with a replacement need, assigns and confirms a replaceme
     await expect(page.getByRole("heading", { name: "Planning", level: 1 })).toBeVisible();
     await page.getByText("Nouvelle affectation").click();
     const create = page.getByRole("form", { name: "Nouvelle affectation" });
-    await create.getByLabel("Collaborateur").selectOption({ label: `${backup.fullName} (BACKUP-${fixture.suffix.slice(-5)})` });
+    await create.getByLabel("Collaborateur").selectOption({ label: `${backup.fullName} (BACKUP-${fixture.suffix.slice(-5).toUpperCase()})` });
     await create.getByLabel("Site").selectOption({ label: "Site Plan (PLAN)" });
     await create.getByLabel("Équipe (facultatif)").selectOption({ label: "Équipe soir — Site Plan" });
     await create.getByLabel("Début").fill("2026-10-01");

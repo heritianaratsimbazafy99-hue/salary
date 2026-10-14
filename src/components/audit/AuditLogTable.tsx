@@ -121,13 +121,13 @@ export function AuditLogTable({ logs }: { logs: AuditLog[] }) {
                         </time>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="inline-flex items-center rounded-md bg-primary/[0.06] px-2 py-0.5 font-mono font-medium text-primary">
+                        <span className="inline-flex min-w-0 max-w-full items-center rounded-md bg-primary/[0.06] px-2 py-0.5 font-mono font-medium text-primary [overflow-wrap:anywhere]">
                           {log.action}
                         </span>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${toneTile[ROLE_TONE[log.actorRole ?? ""] ?? "neutral"]}`}>
                           {log.actorRole ?? "Systeme"}
                         </span>
-                        <span className="inline-flex items-center rounded-md px-2 py-0.5 font-mono text-muted-foreground ring-1 ring-border">
+                        <span className="inline-flex min-w-0 max-w-full items-center rounded-md px-2 py-0.5 font-mono text-muted-foreground ring-1 ring-border [overflow-wrap:anywhere]">
                           {log.resourceType}
                         </span>
                       </div>
