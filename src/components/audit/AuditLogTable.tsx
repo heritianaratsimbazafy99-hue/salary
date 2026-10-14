@@ -3,6 +3,7 @@ import {
   Activity,
   BarChart3,
   Building2,
+  CalendarDays,
   Download,
   Eye,
   FileUp,
@@ -32,11 +33,25 @@ const ROLE_TONE: Record<string, Tone> = {
   agency_manager: "primary",
   hr_central: "accent",
   super_admin: "amber",
+  team_manager: "primary",
+  client_viewer: "neutral",
 };
 
 /** Human description + icon for an audit action code (raw code stays visible). */
 export function describeAuditAction(action: string): { title: string; icon: LucideIcon; tone: Tone } {
   const rules: Array<[RegExp, string, LucideIcon, Tone]> = [
+    [/^hr_document\.withdrawn$/, "Document RH retiré", UserX, "danger"],
+    [/^hr_document\./, "Document RH déposé", FileUp, "primary"],
+    [/^hr_(employee|employee_record|private_details)\./, "Dossier collaborateur", UserCog, "primary"],
+    [/^hr_cnaps\./, "Suivi CNAPS", ScrollText, "amber"],
+    [/^hr_leave_balance\./, "Correction de solde de congés", PencilLine, "amber"],
+    [/^hr_leave\./, "Congé ou absence", CalendarDays, "teal"],
+    [/^hr_(assignment|replacement)\./, "Planning et remplacements", CalendarDays, "primary"],
+    [/^hr_request\./, "Demande RH", Mail, "teal"],
+    [/^hr_report(_subscription)?\./, "Rapport RH", Download, "teal"],
+    [/^hr_access\.revoked$/, "Accès RH retiré", UserX, "danger"],
+    [/^hr_access\./, "Gestion des accès RH", UserCog, "primary"],
+    [/^hr_(site|department|team)\./, "Organisation RH", Building2, "primary"],
     [/PUBLISH/, "Publication de fiches", Rocket, "success"],
     [/EXPORT/, "Export de données", Download, "teal"],
     [/ANALYTICS/, "Consultation des analyses", BarChart3, "primary"],

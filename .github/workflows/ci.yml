@@ -76,6 +76,14 @@ jobs:
           docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/payroll-retention.sql
           docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/payroll-manager-review.sql
           docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < src/test/rls/admin-lifecycle-postflight.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-foundations.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-employee-records.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-employee-documents.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-leaves.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-assignments-replacements.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-requests.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-reporting.sql
+          bash scripts/tests/hr-leave-concurrency.sh
 
       - name: Run authenticated browser tests
         run: npm run test:e2e -- --project=chromium

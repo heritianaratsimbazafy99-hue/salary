@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Activity, BarChart3, CalendarDays, ScrollText, Users } from "lucide-react";
 
@@ -7,17 +8,18 @@ import { AppShell } from "@/components/shell/AppShell";
 import { HeaderStat, PageHeader } from "@/components/shell/PageHeader";
 import { ColumnChart } from "@/components/ui/Charts";
 import { Panel } from "@/components/ui/Surface";
+import { buttonClasses } from "@/components/ui/Button";
 import { requireCanReadPayrollAnalytics } from "@/lib/admin/auth";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
   FORBIDDEN_ERROR_MESSAGE,
 } from "@/lib/admin/permissions";
-import { loadRecentAuditLogs } from "@/lib/audit/queries";
+import { loadRecentAuditLogs, type AuditDomain } from "@/lib/audit/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AuditPage() {
+export default async function AuditPage({ searchParams }: { searchParams?: Promise<{ domain?: string }> } = {}) {
   let actor: Awaited<ReturnType<typeof requireCanReadPayrollAnalytics>>;
 
   try {
@@ -34,8 +36,10 @@ export default async function AuditPage() {
     throw error;
   }
 
+  const params = await searchParams ?? {};
+  const domain: AuditDomain | undefined = params.domain === "hr" || params.domain === "other" ? params.domain : undefined;
   const supabase = await createClient();
-  const logs = await loadRecentAuditLogs(supabase);
+  const logs = await loadRecentAuditLogs(supabase, 50, domain);
 
   const roles = new Set(logs.map((log) => log.actorRole ?? "system")).size;
   const perDay = new Map<string, number>();
@@ -69,6 +73,11 @@ export default async function AuditPage() {
             <HeaderStat icon={CalendarDays} label="Jours couverts" value={activity.length} />
           </div>
         </PageHeader>
+        <nav aria-label="Filtrer le journal" className="flex flex-wrap gap-2">
+          {([[undefined, "Tout"], ["hr", "Ressources humaines"], ["other", "Paie et accès"]] as const).map(([value, label]) => (
+            <Link key={label} aria-current={domain === value ? "page" : undefined} className={buttonClasses({ variant: domain === value ? "primary" : "secondary", size: "sm" })} href={value ? `/hr/audit?domain=${value}` : "/hr/audit"}>{label}</Link>
+          ))}
+        </nav>
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="min-w-0 xl:order-2 xl:sticky xl:top-8">
             {activity.length > 1 ? (

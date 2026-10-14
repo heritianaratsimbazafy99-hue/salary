@@ -20,15 +20,22 @@ export type AuditLogRow = {
 
 const AUDIT_LOG_COLUMNS = "id,actor_role,action,resource_type,created_at";
 
+/** "hr" = HR module actions (hr_*); "other" = payroll, access and platform actions. */
+export type AuditDomain = "hr" | "other";
+
 export async function loadRecentAuditLogs(
   supabase: SupabaseReadClient,
   limit = 50,
+  domain?: AuditDomain,
 ): Promise<AuditLogRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("audit_logs")
     .select(AUDIT_LOG_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (domain === "hr") query = query.like("action", "hr\\_%");
+  if (domain === "other") query = query.not("action", "like", "hr\\_%");
+  const { data, error } = await query;
 
   if (error) {
     throw new Error("Impossible de charger le journal d'audit.");

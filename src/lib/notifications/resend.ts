@@ -85,3 +85,27 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+export type ContractAlertItem = { fullName: string; matricule: string; siteName: string; contractType: string; contractEnd: string; daysLeft: number; agencyName: string };
+
+/** One daily digest per HR recipient (never one email per contract). */
+export function buildContractAlertEmail(input: { recipientName: string; appUrl: string; items: ContractAlertItem[] }) {
+  const url = new URL("/hr/dashboard", safeAppOrigin(input.appUrl)).toString();
+  const rows = input.items.map((item) => `<tr><td>${escapeHtml(item.fullName)} (${escapeHtml(item.matricule)})</td><td>${escapeHtml(item.agencyName)} · ${escapeHtml(item.siteName)}</td><td>${escapeHtml(item.contractType)}</td><td>${escapeHtml(item.contractEnd)}</td><td>J-${item.daysLeft}</td></tr>`).join("");
+  return {
+    subject: `${input.items.length} contrat(s) arrivent à échéance`,
+    html: `<p>Bonjour ${escapeHtml(input.recipientName)},</p><p>Les contrats suivants arrivent à échéance (seuils J-30, J-15 et J-7) :</p><table cellpadding="6" border="1" style="border-collapse:collapse"><thead><tr><th>Collaborateur</th><th>Agence · site</th><th>Contrat</th><th>Fin</th><th>Échéance</th></tr></thead><tbody>${rows}</tbody></table><p><a href="${escapeHtml(url)}">Ouvrir le tableau de bord RH</a></p>`,
+  };
+}
+
+export type MonthlyReportSummary = { label: string; value: string }[];
+
+/** Monthly summary for a recipient's own scope; the detailed CSV is attached. */
+export function buildMonthlyReportEmail(input: { recipientName: string; appUrl: string; agencyName: string; monthLabel: string; summary: MonthlyReportSummary; dashboardPath: string }) {
+  const url = new URL(input.dashboardPath, safeAppOrigin(input.appUrl)).toString();
+  const rows = input.summary.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td><strong>${escapeHtml(row.value)}</strong></td></tr>`).join("");
+  return {
+    subject: `Rapport RH ${input.monthLabel} — ${input.agencyName}`,
+    html: `<p>Bonjour ${escapeHtml(input.recipientName)},</p><p>Voici le rapport RH de ${escapeHtml(input.monthLabel)} pour ${escapeHtml(input.agencyName)}, limité à votre périmètre. Le détail par site est joint au format CSV.</p><table cellpadding="6" border="1" style="border-collapse:collapse"><tbody>${rows}</tbody></table><p><a href="${escapeHtml(url)}">Ouvrir le tableau de bord</a></p>`,
+  };
+}

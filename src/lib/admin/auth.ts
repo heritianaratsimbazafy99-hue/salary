@@ -5,8 +5,10 @@ import { createClient } from "../supabase/server";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
   FORBIDDEN_ERROR_MESSAGE,
+  assertCanAdministerHrAccess,
   assertCanAssignAgencyManager,
   assertCanManageAgencies,
+  assertCanManageHrReferential,
   assertCanManagePayrollForAgency,
   assertCanReadPayrollAnalytics,
   isAppRole,
@@ -122,4 +124,20 @@ export async function requireCanAssignAgencyManager(): Promise<AppRole> {
   assertCanAssignAgencyManager(role);
 
   return role;
+}
+
+export async function requireCanManageHrReferential(): Promise<CurrentActor> {
+  const actor = await getCurrentActor();
+
+  assertCanManageHrReferential(actor.role);
+
+  return actor;
+}
+
+export async function requireCanAdministerHrAccess(): Promise<CurrentActor> {
+  const actor = await getCurrentActor();
+
+  assertCanAdministerHrAccess(actor.role);
+
+  return actor;
 }
