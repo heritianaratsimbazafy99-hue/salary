@@ -14,7 +14,7 @@ const localSupabasePublishableKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
-const localAppUrl = assertLocalE2EUrl(process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3000", "E2E app");
+const localAppUrl = assertLocalE2EUrl(process.env.E2E_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3000", "E2E app");
 const localSupabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? readSupabaseStatusValue("SERVICE_ROLE_KEY");
 const localResendApiKey = process.env.RESEND_API_KEY ?? ["re", "local_e2e_resend_key_placeholder"].join("_");
