@@ -22,6 +22,7 @@ const localResendApiKey = process.env.RESEND_API_KEY ?? ["re", "local_e2e_resend
 const localCronSecret = process.env.CRON_SECRET ?? ["local", "e2e", "cron", "bearer", "placeholder", "0001"].join("-");
 const localResendFromEmail = process.env.RESEND_FROM_EMAIL ?? "MadajobPay <no-reply@local.test>";
 const useProductionBuild = process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1";
+const localAppPort = new URL(localAppUrl).port || "3000";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -31,7 +32,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: localAppUrl,
     trace: "on-first-retry",
   },
   projects: [
@@ -43,7 +44,7 @@ export default defineConfig({
     url: "http://127.0.0.1:55428/health",
     reuseExistingServer: true,
   }, {
-    command: useProductionBuild ? "npm run start" : "npm run dev",
+    command: `${useProductionBuild ? "npm run start" : "npm run dev"} -- --port ${localAppPort}`,
     env: {
       ...inheritedEnv,
       NEXT_PUBLIC_APP_URL: localAppUrl,
@@ -57,8 +58,9 @@ export default defineConfig({
       NEXT_PUBLIC_SENTRY_DSN: "",
       ...(localSupabaseServiceRoleKey ? { SUPABASE_SERVICE_ROLE_KEY: localSupabaseServiceRoleKey } : {}),
     },
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !useProductionBuild,
+    url: localAppUrl,
+    // Fail on a port conflict instead of testing an unrelated local project.
+    reuseExistingServer: false,
   }],
 });
 
