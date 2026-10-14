@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity, BarChart3, BookOpen, Building2, CalendarDays, CalendarRange, Contact, Download, Eye, FileText, FileUp, IdCard, KeyRound,
@@ -79,7 +79,7 @@ type RoleNavProps = {
 };
 
 function linkClass(isCurrent: boolean) {
-  return `group relative flex min-h-14 w-full min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-1.5 text-center text-[0.7rem] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-xl lg:px-3 lg:text-left lg:text-sm ${
+  return `group relative flex min-h-14 w-full min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-center text-[0.7rem] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-xl lg:px-3 lg:text-left lg:text-sm ${
     isCurrent ? "text-ink-foreground lg:bg-ink-foreground/10" : "text-ink-muted hover:text-ink-foreground lg:hover:bg-ink-foreground/[0.06]"}`;
 }
 
@@ -109,13 +109,14 @@ function NavIcon({ icon: Icon, isCurrent }: { icon: LucideIcon; isCurrent: boole
 export function RoleNav({ role }: RoleNavProps) {
   const pathname = usePathname() ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const morePanelRef = useRef<HTMLDivElement>(null);
   const groups = GROUPS_BY_ROLE[role];
   const lastGroup = groups[groups.length - 1];
   const groupsWithGuide: NavGroup[] = [...groups.slice(0, -1), { ...lastGroup, links: [...lastGroup.links, GUIDE] }];
   const links = groupsWithGuide.flatMap((group) => group.links);
   const overflow = links.length > MOBILE_SLOTS;
   const mobileVisible = new Set((overflow ? links.slice(0, MOBILE_SLOTS - 1) : links).map((link) => link.href));
-  const spread = overflow || links.length <= 4;
   // Only the most specific match is current (e.g. /team/leaves, not also /team).
   const currentHref = links
     .filter((link) => pathname === link.href || pathname.startsWith(`${link.href}/`))
@@ -124,7 +125,13 @@ export function RoleNav({ role }: RoleNavProps) {
 
   useEffect(() => {
     if (!moreOpen) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMoreOpen(false); };
+    morePanelRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMoreOpen(false);
+        moreButtonRef.current?.focus();
+      }
+    };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [moreOpen]);
@@ -135,7 +142,7 @@ export function RoleNav({ role }: RoleNavProps) {
       className="fixed inset-x-3 bottom-3 z-50 rounded-[1.4rem] border border-ink-foreground/10 bg-ink/95 p-1.5 text-ink-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl pb-safe lg:static lg:inset-auto lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
     >
       {moreOpen ? (
-        <div id="nav-more" className="absolute inset-x-0 bottom-full mb-2 max-h-[70dvh] overflow-y-auto rounded-[1.4rem] border border-ink-foreground/10 bg-ink/95 p-3 shadow-[var(--shadow-lg)] backdrop-blur-xl lg:hidden">
+        <div ref={morePanelRef} id="nav-more" className="absolute inset-x-0 bottom-full mb-2 max-h-[70dvh] overflow-y-auto rounded-[1.4rem] border border-ink-foreground/10 bg-ink/95 p-3 shadow-[var(--shadow-lg)] backdrop-blur-xl lg:hidden">
           {groupsWithGuide.map((group, index) => {
             const hidden = group.links.filter((link) => !mobileVisible.has(link.href));
             if (!hidden.length) return null;
@@ -152,13 +159,13 @@ export function RoleNav({ role }: RoleNavProps) {
           })}
         </div>
       ) : null}
-      <ul className={`no-scrollbar flex gap-1 lg:flex-col ${spread ? "justify-around" : "snap-x overflow-x-auto"}`}>
+      <ul className="flex gap-1 lg:flex-col">
         {groupsWithGuide.map((group, groupIndex) => [
           group.label ? <li key={`label-${group.label}`} aria-hidden="true" className={`hidden px-3 pb-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-muted/80 lg:block ${groupIndex ? "pt-4" : ""}`}>{group.label}</li> : null,
           ...group.links.map((link) => {
             const isCurrent = link.href === currentHref;
             return (
-              <li className={`snap-start ${spread ? "flex-1" : "shrink-0"} lg:flex-none ${mobileVisible.has(link.href) ? "" : "hidden lg:block"}`} key={link.href}>
+              <li className={`min-w-0 flex-1 lg:flex-none ${mobileVisible.has(link.href) ? "" : "hidden lg:block"}`} key={link.href}>
                 <Link aria-current={isCurrent ? "page" : undefined} className={linkClass(isCurrent)} href={link.href}>
                   <NavIcon icon={link.icon} isCurrent={isCurrent} />
                   <NavLabel link={link} />
@@ -169,8 +176,8 @@ export function RoleNav({ role }: RoleNavProps) {
           }),
         ])}
         {overflow ? (
-          <li className="flex-1 lg:hidden">
-            <button type="button" aria-expanded={moreOpen} aria-controls="nav-more" onClick={() => setMoreOpen((open) => !open)} className={linkClass(moreOpen || currentInMore)}>
+          <li className="min-w-0 flex-1 lg:hidden">
+            <button ref={moreButtonRef} type="button" aria-expanded={moreOpen} aria-controls="nav-more" onClick={() => setMoreOpen((open) => !open)} className={linkClass(moreOpen || currentInMore)}>
               <NavIcon icon={moreOpen ? X : MoreHorizontal} isCurrent={moreOpen || currentInMore} />
               {moreOpen ? "Fermer" : "Plus"}
             </button>

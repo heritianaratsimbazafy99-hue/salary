@@ -12,6 +12,7 @@ export default defineConfig([
     "coverage/**",
     "node_modules/**",
     "out/**",
+    "output/playwright/**",
     "playwright-report/**",
     "test-results/**",
     "worktrees/**",

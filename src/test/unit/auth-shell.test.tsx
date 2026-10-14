@@ -83,8 +83,10 @@ describe("RoleNav mobile overflow", () => {
     expect(sheet?.textContent).toContain("Agences");
     expect(sheet?.textContent).toContain("Guide");
     expect(sheet?.textContent).not.toContain("Tableau de bord");
+    expect(document.activeElement).toBe(sheet?.querySelector("a"));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(document.getElementById("nav-more")).toBeNull();
+    expect(document.activeElement).toBe(more);
   });
 
   it("does not add a Plus button when every destination fits", () => {

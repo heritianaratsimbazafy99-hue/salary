@@ -1,4 +1,5 @@
 import "server-only";
+import { EmployeeIdSchema } from "@/lib/employees/identity";
 
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -85,7 +86,7 @@ const INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 const EmployeeIdentityInputSchema = z.object({
   agencyId: z.string().trim().regex(UUID_PATTERN),
-  employeeId: z.string().trim().min(1).max(80),
+  employeeId: EmployeeIdSchema,
   email: z
     .string()
     .trim()
@@ -98,7 +99,7 @@ const EmployeeIdentityInputSchema = z.object({
 export function normalizeEmployeeIdentity(input: EmployeeIdentityInput): EmployeeIdentity {
   return {
     agencyId: input.agencyId,
-    employeeId: input.employeeId.trim().toUpperCase(),
+    employeeId: EmployeeIdSchema.parse(input.employeeId),
     email: input.email.trim().toLowerCase(),
     fullName: input.fullName.trim().replace(/\s+/g, " "),
   };
@@ -196,6 +197,9 @@ export async function ensureEmployeeAuthProfile(
   const identity = normalizeEmployeeIdentity(parsedInput.data);
   const previousEmployee = await findExistingEmployee(admin, identity);
   if (previousEmployee?.isActive === false) throw new Error("Ce salarié est désactivé. Une réactivation RH est nécessaire.");
+  if (previousEmployee && previousEmployee.email.toLowerCase() !== identity.email) {
+    throw new Error("L’email diffère du dossier salarié. Faites vérifier son identité avant de publier.");
+  }
   const profileId = previousEmployee?.profileId ?? null;
   const employeeRollback = {
     identity,
@@ -352,7 +356,7 @@ async function upsertPublicationEmployee(
   if (input.exists) {
     const query = admin.from("employees").update(payload)
       .eq("agency_id", input.identity.agencyId).eq("employee_id", input.identity.employeeId)
-      .eq("is_active", true);
+      .eq("is_active", true).eq("email", input.identity.email);
     mutation = input.profileId ? query.eq("profile_id", input.profileId) : query.is("profile_id", null);
   } else {
     mutation = admin.from("employees").upsert(payload, {

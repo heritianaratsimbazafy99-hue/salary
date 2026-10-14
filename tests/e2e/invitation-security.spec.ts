@@ -15,7 +15,7 @@ const test = base.extend<{ invitation: InvitationFixture }>({
   invitation: async ({}, runFixture) => {
     const fixture = await createPayrollE2EFixture();
     const authUserIds: string[] = [];
-    const employeeId = `security-${fixture.suffix}`;
+    const employeeId = `security-${fixture.suffix}`.toUpperCase();
     const tokenHash = randomBytes(32).toString("hex");
     try {
       const employee = await fixture.admin.from("employees").insert({

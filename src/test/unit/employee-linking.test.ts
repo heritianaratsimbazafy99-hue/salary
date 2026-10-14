@@ -237,9 +237,19 @@ describe("ensureEmployeeAuthProfile", () => {
     expect(tableWithUpsert(client, "employee_invitations").upsert).not.toHaveBeenCalled();
   });
 
+  it("rejects an email change without changing identity, access or invitation", async () => {
+    const client = createEmployeeProvisioningClient({ existingEmployee: {
+      employee_id: "EMP-001", email: "old@example.com", full_name: "Worker", is_active: true, profile_id: "linked-profile",
+    } });
+    const { ensureEmployeeAuthProfile } = await import("@/lib/employees/linking");
+    await expect(ensureEmployeeAuthProfile({ agencyId: AGENCY_ID, employeeId: "emp-001", email: "new@example.com", fullName: "Worker", invitedByProfileId: INVITED_BY_PROFILE_ID }, client as unknown as Parameters<typeof ensureEmployeeAuthProfile>[1])).rejects.toThrow("email diffère");
+    expect(tableWithUpdate(client, "employees").update).not.toHaveBeenCalled();
+    expect(tableWithUpsert(client, "employee_invitations").upsert).not.toHaveBeenCalled();
+  });
+
   it("restores the previous employee row when invitation creation fails after refresh", async () => {
     const previousEmployee = {
-      email: "old-worker@example.com",
+      email: "worker@example.com",
       employee_id: "EMP-001",
       full_name: "Old Worker",
       is_active: true,

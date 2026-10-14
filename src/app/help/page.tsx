@@ -190,7 +190,7 @@ export default async function HelpPage() {
         <section id="aide" className="scroll-mt-24 grid gap-4" aria-labelledby="aide-title">
           <SectionTitle id="aide-title" icon={LifeBuoy} tone="amber" eyebrow="Support">Obtenir de l’aide</SectionTitle>
           <div className="brand-gradient grid gap-5 rounded-3xl p-6 text-primary-foreground shadow-[var(--shadow-md)] md:grid-cols-[1fr_auto] md:items-center">
-            <p className="text-sm leading-6 text-primary-foreground/85">Pour une adresse erronée, un accès bloqué ou une fiche à corriger, contactez <a className="font-semibold text-primary-foreground underline decoration-accent decoration-2 underline-offset-4" href="mailto:heritiana.ratsimbazafy99@gmail.com">heritiana.ratsimbazafy99@gmail.com</a>. Indiquez votre agence, la période et le message d’erreur, sans envoyer de lien de connexion ni de copie complète de vos données de paie.</p>
+            <p className="min-w-0 text-sm leading-6 text-primary-foreground/85 [overflow-wrap:anywhere]">Pour une adresse erronée, un accès bloqué ou une fiche à corriger, contactez <a className="font-semibold text-primary-foreground underline decoration-accent decoration-2 underline-offset-4" href="mailto:heritiana.ratsimbazafy99@gmail.com">heritiana.ratsimbazafy99@gmail.com</a>. Indiquez votre agence, la période et le message d’erreur, sans envoyer de lien de connexion ni de copie complète de vos données de paie.</p>
             <a className={buttonClasses({ variant: "accent" })} href="mailto:heritiana.ratsimbazafy99@gmail.com">
               <Mail className="size-4" aria-hidden="true" />
               Écrire au support

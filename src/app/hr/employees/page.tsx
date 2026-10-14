@@ -68,7 +68,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams?: P
       {canCreate ? <details><summary className="cursor-pointer text-sm font-semibold">Créer un dossier dans {agency.name}</summary>
         <AdminForm action={create} label="Nouveau collaborateur" resetOnSuccess className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <input type="hidden" name="agencyId" value={agency.id} />
-          <Input id="new-employee-matricule" label="Matricule paie" name="matricule" maxLength={64} required hint="Identifiant utilisé dans les fichiers de paie." />
+          <Input id="new-employee-matricule" label="Matricule paie" name="matricule" maxLength={80} required hint="Identifiant de paie : les lettres a–z sont enregistrées en majuscules." />
           <Input id="new-employee-name" label="Nom complet" name="fullName" maxLength={160} required />
           <Input id="new-employee-email" label="Email de connexion" name="email" type="email" maxLength={254} required />
           <EmployeeRecordFields prefix="new-employee" referential={referential} managers={managers} />

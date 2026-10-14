@@ -19,7 +19,8 @@ type Props = {
 
 /** Quality summary of an import: share of valid rows, counters and each error. */
 export function ImportReport({ validRowCount, invalidRowCount, unknownEmployeeCount, errors }: Props) {
-  const total = validRowCount + invalidRowCount + unknownEmployeeCount;
+  // Unknown employees are already included in the validated rows.
+  const total = validRowCount + invalidRowCount;
   const quality = total > 0 ? validRowCount / total : 0;
 
   return (
@@ -39,7 +40,7 @@ export function ImportReport({ validRowCount, invalidRowCount, unknownEmployeeCo
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               {total === 0
                 ? "Aucune ligne analysée pour le moment."
-                : errors.length === 0 && invalidRowCount + unknownEmployeeCount === 0
+                : errors.length === 0 && invalidRowCount === 0
                   ? "Toutes les lignes sont exploitables."
                   : "Seules les lignes valides seront publiées."}
             </p>

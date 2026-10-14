@@ -516,7 +516,7 @@ function normalizeSameSite(value: CapturedCookieOptions["sameSite"]) {
 }
 
 function resolveAppUrl() {
-  return assertLocalE2EUrl(process.env.E2E_APP_URL ?? DEFAULT_APP_URL, "E2E app");
+  return assertLocalE2EUrl(process.env.E2E_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? DEFAULT_APP_URL, "E2E app");
 }
 
 function resolveSupabaseUrl() {

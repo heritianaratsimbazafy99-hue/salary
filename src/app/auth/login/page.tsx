@@ -170,9 +170,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         <div className="relative my-auto max-w-lg py-12">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Espace salarié</p>
-          <h1 className="mt-4 font-display text-4xl font-bold leading-[1.1] xl:text-5xl">
+          <p className="mt-4 font-display text-4xl font-bold leading-[1.1] xl:text-5xl">
             Un lien dans votre boîte mail, et vous y êtes.
-          </h1>
+          </p>
           <p className="mt-5 text-base leading-7 text-ink-muted">
             La connexion par lien magique ouvre votre espace personnel selon votre rôle — salarié,
             manager d&apos;agence ou RH centrale.
@@ -257,9 +257,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           ) : (
             <BrandLogo markOnly href={null} markSize={48} priority />
           )}
-          <h2 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
             Connexion à MadajobPay
-          </h2>
+          </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             Saisissez votre adresse professionnelle. Nous vous envoyons un lien de connexion
             sécurisé.
