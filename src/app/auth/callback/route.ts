@@ -12,6 +12,8 @@ const ROLE_REDIRECTS: Record<AppRole, string> = {
   employee: "/employee/payslips",
   hr_central: "/hr/analytics",
   super_admin: "/hr/analytics",
+  team_manager: "/team",
+  client_viewer: "/client",
 };
 
 function noStoreRedirect(response: NextResponse): NextResponse {

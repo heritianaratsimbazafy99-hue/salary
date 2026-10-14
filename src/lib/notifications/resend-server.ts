@@ -134,3 +134,21 @@ async function sendWithRetry<T extends ProviderResponse>(send: () => Promise<T>)
 }
 
 function delay(milliseconds: number) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
+
+export type HrNotificationEmail = {
+  to: string;
+  subject: string;
+  html: string;
+  idempotencyKey: string;
+  attachments?: Array<{ filename: string; content: string }>;
+};
+
+/** HR alerts and reports. The caller supplies a stable idempotency key per logical delivery. */
+export async function sendHrNotificationEmail(input: HrNotificationEmail) {
+  const resend = client();
+  const message = {
+    from: serverEnv.RESEND_FROM_EMAIL, to: input.to, subject: input.subject, html: input.html,
+    ...(input.attachments ? { attachments: input.attachments.map((file) => ({ filename: file.filename, content: Buffer.from(file.content, "utf8") })) } : {}),
+  };
+  return sendWithRetry(() => resend.emails.send(message, requestOptions(requestKey("hr-notification", input.idempotencyKey))));
+}

@@ -18,6 +18,8 @@ const localAppUrl = assertLocalE2EUrl(process.env.NEXT_PUBLIC_APP_URL ?? "http:/
 const localSupabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? readSupabaseStatusValue("SERVICE_ROLE_KEY");
 const localResendApiKey = process.env.RESEND_API_KEY ?? ["re", "local_e2e_resend_key_placeholder"].join("_");
+// Local placeholder for the Vercel Cron bearer (not a real secret; production sets its own).
+const localCronSecret = process.env.CRON_SECRET ?? ["local", "e2e", "cron", "bearer", "placeholder", "0001"].join("-");
 const localResendFromEmail = process.env.RESEND_FROM_EMAIL ?? "MadajobPay <no-reply@local.test>";
 const useProductionBuild = process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1";
 
@@ -50,6 +52,7 @@ export default defineConfig({
       RESEND_API_KEY: localResendApiKey,
       RESEND_FROM_EMAIL: localResendFromEmail,
       RESEND_BASE_URL: "http://127.0.0.1:55428",
+      CRON_SECRET: localCronSecret,
       SENTRY_DSN: "",
       NEXT_PUBLIC_SENTRY_DSN: "",
       ...(localSupabaseServiceRoleKey ? { SUPABASE_SERVICE_ROLE_KEY: localSupabaseServiceRoleKey } : {}),

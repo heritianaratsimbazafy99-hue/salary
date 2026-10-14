@@ -8,7 +8,7 @@ import { createBrowserClient as createSsrBrowserClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import ExcelJS from "exceljs";
 
-type AppRole = "agency_manager" | "employee" | "hr_central" | "super_admin";
+type AppRole = "agency_manager" | "employee" | "hr_central" | "super_admin" | "team_manager" | "client_viewer";
 
 type TestProfile = {
   authUserId: string;
@@ -46,6 +46,64 @@ export type PayrollE2EFixture = {
 
 const DEFAULT_SUPABASE_URL = "http://127.0.0.1:55421";
 const DEFAULT_APP_URL = "http://127.0.0.1:3000";
+
+export type HrE2EFixture = {
+  admin: SupabaseClient;
+  agencyId: string;
+  hr: TestProfile;
+  superAdmin: TestProfile;
+  password: string;
+  suffix: string;
+  /** Emails of accounts created through the UI, removed with the fixture. */
+  createdEmails: string[];
+  cleanup: () => Promise<void>;
+};
+
+/** Agency + HR central + super admin. HR referential rows cascade with the agency. */
+export async function createHrE2EFixture(): Promise<HrE2EFixture> {
+  const admin = createAdminClient();
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const password = createTestPassword(suffix);
+  const authUserIds: string[] = [];
+  const profileIds: string[] = [];
+  const createdEmails: string[] = [];
+  const { data: agency, error: agencyError } = await admin.from("agencies")
+    .insert({ code: `HR${suffix.slice(-6).toUpperCase()}`, name: `Codex RH ${suffix}` }).select("id").single();
+  if (agencyError || typeof agency?.id !== "string") throw new Error(`Unable to create HR E2E agency: ${agencyError?.message ?? "missing id"}`);
+  const agencyId = agency.id;
+  const cleanup = async () => {
+    for (const email of createdEmails) {
+      const { data } = await admin.from("profiles").select("id,auth_user_id").eq("email", email).maybeSingle();
+      if (typeof data?.id === "string") profileIds.push(data.id);
+      if (typeof data?.auth_user_id === "string") authUserIds.push(data.auth_user_id);
+    }
+    // Documents reference their uploader; tests remove the stored objects themselves.
+    await throwOnCleanupError("delete HR documents", await admin.from("employee_documents").delete().eq("agency_id", agencyId));
+    // Leave rows reference their authors (requested_by, decided_by, actor_profile_id).
+    await throwOnCleanupError("delete HR requests", await admin.from("hr_requests").delete().eq("agency_id", agencyId));
+    await throwOnCleanupError("delete replacements", await admin.from("hr_replacements").delete().eq("agency_id", agencyId));
+    await throwOnCleanupError("delete assignments", await admin.from("hr_assignments").delete().eq("agency_id", agencyId));
+    await throwOnCleanupError("delete leave movements", await admin.from("leave_balance_movements").delete().eq("agency_id", agencyId));
+    await throwOnCleanupError("delete leave requests", await admin.from("leave_requests").delete().eq("agency_id", agencyId));
+    await throwOnCleanupError("delete HR agency audit logs", await admin.from("audit_logs").delete().eq("agency_id", agencyId));
+    if (profileIds.length) {
+      await throwOnCleanupError("delete HR actor audit logs", await admin.from("audit_logs").delete().in("actor_profile_id", profileIds));
+      await throwOnCleanupError("delete HR profiles", await admin.from("profiles").delete().in("id", profileIds));
+    }
+    await throwOnCleanupError("delete HR agency", await admin.from("agencies").delete().eq("id", agencyId));
+    await Promise.allSettled(authUserIds.map((authUserId) => admin.auth.admin.deleteUser(authUserId)));
+  };
+  try {
+    const hr = await createProfile(admin, { email: `codex-hr-${suffix}@example.com`, fullName: "Codex RH", password, role: "hr_central" });
+    authUserIds.push(hr.authUserId); profileIds.push(hr.id);
+    const superAdmin = await createProfile(admin, { email: `codex-super-${suffix}@example.com`, fullName: "Codex Super", password, role: "super_admin" });
+    authUserIds.push(superAdmin.authUserId); profileIds.push(superAdmin.id);
+    return { admin, agencyId, hr, superAdmin, password, suffix, createdEmails, cleanup };
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+}
 
 export async function createPayrollE2EFixture(): Promise<PayrollE2EFixture> {
   const admin = createAdminClient();
@@ -531,3 +589,50 @@ function isLoopbackHost(hostname: string) {
 function createTestPassword(suffix: string) {
   return `MadajobPay.${suffix}.${randomUUID()}`;
 }
+
+/** Calls a service-role RPC of the HR module and fails loudly. */
+export async function hrRpc<T>(fixture: HrE2EFixture, name: string, params: Record<string, unknown>): Promise<T> {
+  const { data, error } = await fixture.admin.rpc(name, params);
+  if (error) throw new Error(`${name}: ${error.message}`);
+  return data as T;
+}
+
+/** Site + department of the fixture agency, created through the HR RPCs. */
+export async function createHrOrganisation(fixture: HrE2EFixture, label = "E2E") {
+  const siteId = await hrRpc<string>(fixture, "hr_save_site", { p_actor_id: fixture.hr.id, p_site_id: null, p_agency_id: fixture.agencyId, p_name: `Site ${label}`, p_code: label.toUpperCase().slice(0, 32), p_active: true, p_revision: null });
+  const departmentId = await hrRpc<string>(fixture, "hr_save_department", { p_actor_id: fixture.hr.id, p_department_id: null, p_agency_id: fixture.agencyId, p_name: `Département ${label}`, p_active: true, p_revision: null });
+  return { siteId, departmentId };
+}
+
+/** HR file + employee login linked to the same employees row, like a payroll-activated account. */
+export async function createHrEmployeeLogin(fixture: HrE2EFixture, label: string, input: { siteId: string; departmentId: string }) {
+  const email = `codex-${label}-${fixture.suffix}@example.com`;
+  fixture.createdEmails.push(email);
+  const employeeId = await hrRpc<string>(fixture, "hr_create_employee", {
+    p_actor_id: fixture.hr.id, p_agency_id: fixture.agencyId, p_matricule: `${label.toUpperCase()}-${fixture.suffix.slice(-5)}`, p_email: email, p_full_name: `Salarié ${label}`,
+    p_job_title: "Agent", p_department_id: input.departmentId, p_site_id: input.siteId, p_team_id: null, p_manager_profile_id: null,
+    p_status: "ACTIVE", p_contract_type: "MISSION", p_contract_start: "2026-01-05", p_contract_end: null,
+  });
+  const { data: user, error } = await fixture.admin.auth.admin.createUser({ email, password: fixture.password, email_confirm: true });
+  if (error || !user.user) throw new Error(`Unable to create ${label}: ${error?.message}`);
+  const { data: profile, error: profileError } = await fixture.admin.from("profiles").insert({ auth_user_id: user.user.id, email, full_name: `Salarié ${label}`, role: "employee" }).select("id").single();
+  if (profileError || !profile) throw new Error(`Unable to create ${label} profile: ${profileError?.message}`);
+  await fixture.admin.from("employees").update({ profile_id: profile.id }).eq("id", employeeId);
+  return { email, employeeId, fullName: `Salarié ${label}` };
+}
+
+/** Team manager or client viewer with a password login, scoped in the fixture agency. */
+export async function createHrScopedUser(fixture: HrE2EFixture, role: "team_manager" | "client_viewer", label: string, scope: Record<string, string>) {
+  const email = `codex-${label}-${fixture.suffix}@example.com`;
+  fixture.createdEmails.push(email);
+  const { data, error } = await fixture.admin.auth.admin.createUser({ email, password: fixture.password, email_confirm: true });
+  if (error || !data.user) throw new Error(`Unable to create ${label}: ${error?.message}`);
+  const id = await hrRpc<string>(fixture, "admin_save_hr_access", {
+    p_actor_id: fixture.superAdmin.id, p_profile_id: null, p_auth_user_id: data.user.id, p_email: email, p_name: `Codex ${label}`,
+    p_role: role, p_active: true, p_scopes: [{ agency_id: fixture.agencyId, ...scope }], p_expected_updated_at: null,
+  });
+  return { email, id, fullName: `Codex ${label}` };
+}
+
+/** Same local placeholder as playwright.config.ts (never a production value). */
+export const E2E_CRON_BEARER = `Bearer ${process.env.CRON_SECRET ?? ["local", "e2e", "cron", "bearer", "placeholder", "0001"].join("-")}`;

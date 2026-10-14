@@ -19,6 +19,16 @@ export function canReadPayrollAnalytics(role: AppRole): boolean {
   return role === "hr_central" || role === "super_admin";
 }
 
+/** HR referential (sites, departments, teams): HR management, not account administration. */
+export function canManageHrReferential(role: AppRole): boolean {
+  return role === "hr_central" || role === "super_admin";
+}
+
+/** Granting HR scopes (team managers, client viewers) is account administration. */
+export function canAdministerHrAccess(role: AppRole): boolean {
+  return role === "super_admin";
+}
+
 export function canManagePayrollForAgency(input: {
   role: AppRole;
   actorAgencyId?: string | null;
@@ -46,6 +56,18 @@ export function assertCanAssignAgencyManager(role: AppRole): void {
 
 export function assertCanReadPayrollAnalytics(role: AppRole): void {
   if (!canReadPayrollAnalytics(role)) {
+    throw new Error(FORBIDDEN_ERROR_MESSAGE);
+  }
+}
+
+export function assertCanManageHrReferential(role: AppRole): void {
+  if (!canManageHrReferential(role)) {
+    throw new Error(FORBIDDEN_ERROR_MESSAGE);
+  }
+}
+
+export function assertCanAdministerHrAccess(role: AppRole): void {
+  if (!canAdministerHrAccess(role)) {
     throw new Error(FORBIDDEN_ERROR_MESSAGE);
   }
 }

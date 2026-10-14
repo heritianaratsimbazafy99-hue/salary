@@ -19,6 +19,7 @@ import {
   Upload,
   Wallet,
   Repeat,
+  UsersRound,
 } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
@@ -46,6 +47,33 @@ const PAYROLL_STEPS: Array<{ icon: LucideIcon; text: string }> = [
   { icon: Repeat, text: "Après publication, une correction passe par un nouvel import de la même période puis une nouvelle publication. L’ancienne version reste inchangée dans le journal interne jusqu’à sa suppression prévue." },
 ];
 
+const HR_GUIDE: Partial<Record<string, { title: string; eyebrow: string; items: string[] }>> = {
+  employee: { title: "Congés, demandes et dossier", eyebrow: "Espace salarié", items: [
+    "« Mes congés » : demandez un congé payé ou une absence autorisée. Seuls les jours ouvrés (lundi au vendredi) sont décomptés ; vous pouvez annuler une demande tant qu’elle est en attente.",
+    "Le solde de congés est tenu par le service RH ; chaque correction est motivée et visible dans l’historique.",
+    "« Demandes » : posez une question au service RH (contrat, paie, congés, démarches) et suivez sa réponse.",
+    "« Mon dossier » : poste, contrat, coordonnées privées, suivi CNAPS et documents déposés par les RH. Vos bulletins restent dans « Mes fiches ».",
+  ] },
+  team_manager: { title: "Piloter votre équipe", eyebrow: "Manager RH", items: [
+    "« Congés » : approuvez ou refusez les demandes de votre périmètre ; les motifs personnels restent réservés au salarié et aux RH. Vous pouvez créer un besoin de remplacement à l’approbation.",
+    "« Planning » : affectez les collaborateurs à un site et une équipe, puis confirmez un remplaçant disponible (actif, sous contrat, sans absence sur la période).",
+    "« Mon équipe » : indicateurs, échéances de contrat et exports CSV de votre périmètre. Les bulletins, documents personnels et coordonnées privées ne vous sont pas accessibles.",
+  ] },
+  client_viewer: { title: "Suivre vos sites", eyebrow: "Espace client", items: [
+    "« Mes sites » : effectifs, couverture, affectations actives, remplacements et échéances de contrat de vos sites.",
+    "Exports CSV des effectifs et des remplacements de votre périmètre.",
+    "Aucune donnée de paie, de congé, de solde, de demande RH, de document ou de CNAPS n’est accessible depuis cet espace.",
+  ] },
+  hr_central: { title: "Gestion RH", eyebrow: "RH", items: [
+    "« Collaborateurs » : complétez le dossier RH (poste, site, contrat, coordonnées privées, suivi administratif CNAPS — pas une télé-déclaration) et déposez les documents privés (PDF, PNG, JPEG, 10 Mo).",
+    "« Congés » : saisissez le solde initial, corrigez-le avec un motif, décidez et annulez avec recrédit automatique.",
+    "« Planning » et « Demandes RH » : affectations, remplacements, réponses aux demandes jusqu’à résolution.",
+    "« Tableau de bord » : indicateurs par agence et par mois, exports CSV (dont les congés approuvés pour le prestataire de paie) et alertes de fin de contrat à J-30, J-15 et J-7.",
+  ] },
+};
+HR_GUIDE.super_admin = { ...HR_GUIDE.hr_central!, items: [...HR_GUIDE.hr_central!.items,
+  "« Accès RH » : créez les managers RH et les accès clients avec leur périmètre, révoquez-les, et choisissez les destinataires des alertes et rapports mensuels."] };
+
 export default async function HelpPage() {
   let actor: Awaited<ReturnType<typeof getCurrentActor>>;
   try { actor = await getCurrentActor(); }
@@ -53,11 +81,13 @@ export default async function HelpPage() {
     if (error instanceof Error && error.message === AUTH_REQUIRED_ERROR_MESSAGE) redirect("/auth/login");
     return <AccessDenied context="Guide d’utilisation" />;
   }
-  const managesPayroll = actor.role !== "employee";
+  const managesPayroll = actor.role === "agency_manager" || actor.role === "hr_central" || actor.role === "super_admin";
+  const hrGuide = HR_GUIDE[actor.role];
   const toc = [
     { href: "#activer", label: "Activer mon espace", icon: KeyRound },
     { href: "#consulter", label: "Consulter mes fiches", icon: FileText },
     ...(managesPayroll ? [{ href: "#publier", label: "Publier une paie", icon: Rocket }] : []),
+    ...(hrGuide ? [{ href: "#rh", label: hrGuide.title, icon: UsersRound }] : []),
     { href: "#aide", label: "Obtenir de l’aide", icon: LifeBuoy },
   ];
 
@@ -147,6 +177,13 @@ export default async function HelpPage() {
             <Callout icon={Shuffle} tone="amber">
               Les lignes invalides ne sont pas publiées. Ne publiez pas un lot tant que les montants et les adresses n’ont pas été validés par votre processus RH.
             </Callout>
+          </section>
+        ) : null}
+
+        {hrGuide ? (
+          <section id="rh" className="scroll-mt-24 grid gap-4" aria-labelledby="rh-title">
+            <SectionTitle id="rh-title" icon={UsersRound} tone="teal" eyebrow={hrGuide.eyebrow}>{hrGuide.title}</SectionTitle>
+            <Panel><ul className="grid gap-3">{hrGuide.items.map((item) => <li key={item} className="flex gap-3 text-sm leading-6"><span aria-hidden="true" className="mt-2 size-2 shrink-0 rounded-full bg-accent" />{item}</li>)}</ul></Panel>
           </section>
         ) : null}
 

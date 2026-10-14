@@ -48,6 +48,13 @@ export function formatDateMedium(value: string) {
   return new Intl.DateTimeFormat("fr-MG", { dateStyle: "medium" }).format(date);
 }
 
+/** Calendar date (YYYY-MM-DD) shown as-is, independent of the server time zone. */
+export function formatDay(isoDate: string) {
+  const date = parseIsoDate(isoDate);
+  if (!date) return isoDate;
+  return new Intl.DateTimeFormat("fr-MG", { dateStyle: "medium", timeZone: "UTC" }).format(date);
+}
+
 export function formatDateTime(value: string) {
   const date = new Date(value);
   if (!value || Number.isNaN(date.getTime())) return "Date inconnue";

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Building2, LifeBuoy, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, Eye, LifeBuoy, LogOut, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 
 import type { AppRole } from "@/lib/roles";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -17,6 +17,8 @@ const ROLE_LABEL: Record<AppRole, string> = {
   agency_manager: "Espace manager",
   hr_central: "Administration RH",
   super_admin: "Administration RH",
+  team_manager: "Espace équipe",
+  client_viewer: "Espace client",
 };
 
 const ROLE_CARD: Record<AppRole, { title: string; description: string; icon: LucideIcon }> = {
@@ -24,6 +26,8 @@ const ROLE_CARD: Record<AppRole, { title: string; description: string; icon: Luc
   agency_manager: { title: "Manager d'agence", description: "Importez, contrôlez, publiez.", icon: Building2 },
   hr_central: { title: "RH centrale", description: "Pilotage multi-agences.", icon: ShieldCheck },
   super_admin: { title: "Super administrateur", description: "Administration complète.", icon: ShieldCheck },
+  team_manager: { title: "Manager RH", description: "Congés, affectations, remplacements.", icon: UsersRound },
+  client_viewer: { title: "Client", description: "Suivi opérationnel de vos sites.", icon: Eye },
 };
 
 /**
@@ -67,12 +71,15 @@ export function AppShell({ children, role }: AppShellProps) {
           </span>
         </div>
 
-        <p className="mb-2 mt-7 hidden px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-muted/80 lg:block">
+        {/* Grouped menus (HR roles) carry their own section titles. */}
+        <p className={`mb-2 mt-7 hidden px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-muted/80 ${role === "hr_central" || role === "super_admin" ? "" : "lg:block"}`}>
           Navigation
         </p>
+        {role === "hr_central" || role === "super_admin" ? <div aria-hidden="true" className="hidden h-6 lg:block" /> : null}
         <RoleNav role={role} />
 
-        <div className="mt-auto hidden rounded-2xl border border-ink-foreground/10 bg-gradient-to-br from-teal/25 to-accent/10 p-4 lg:block">
+        {/* Roles with a long grouped menu keep the Guide link instead of this card. */}
+        <div className={`mt-auto hidden rounded-2xl border border-ink-foreground/10 bg-gradient-to-br from-teal/25 to-accent/10 p-4 ${role === "hr_central" || role === "super_admin" ? "" : "lg:block"}`}>
           <span className="flex size-9 items-center justify-center rounded-xl bg-ink-foreground/10 text-accent">
             <LifeBuoy className="size-4" aria-hidden="true" />
           </span>
@@ -82,7 +89,7 @@ export function AppShell({ children, role }: AppShellProps) {
           </p>
         </div>
 
-        <form action={logout} className="ml-auto lg:ml-0 lg:mt-3">
+        <form action={logout} className="ml-auto lg:ml-0 lg:mt-3 lg:shrink-0">
           <button
             className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:w-full lg:text-ink-muted lg:hover:bg-ink-foreground/10 lg:hover:text-ink-foreground lg:focus-visible:ring-accent"
             type="submit"

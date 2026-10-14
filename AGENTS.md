@@ -22,6 +22,16 @@ Vérifier les identités et la configuration actuelles avant écriture externe. 
 
 ## Vérification et livraison
 
-`npm run verify:ci` : secrets, lint, typage, tests, build et audit. `npm run verify:full` ajoute E2E et advisors. Tests E2E destructifs exclusivement en local ; utiliser les clés de `supabase status`, jamais les clés de production. Après `supabase db reset --local`, exécuter les trois suites SQL inscrites dans `.github/workflows/ci.yml` ; elles annulent leurs fixtures.
+`npm run verify:ci` : secrets, lint, typage, tests, build et audit. `npm run verify:full` ajoute E2E et advisors. Tests E2E destructifs exclusivement en local ; utiliser les clés de `supabase status`, jamais les clés de production. Après `supabase db reset --local`, exécuter les suites SQL inscrites dans `.github/workflows/ci.yml` ; elles annulent leurs fixtures.
 
 Les mutations de base et services E2E partagés appartiennent à un seul agent à la fois. Répartir les écritures des sous-agents par fichiers. Pour publier, vérifier les gates, appliquer/journaliser les migrations sur la bonne cible, vérifier le commit réellement promu, les emails autorisés et les parcours essentiels ; nettoyer les fixtures et révoquer leurs sessions. Consigner distinctement les preuves locales et de production.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
