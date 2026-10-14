@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const analyticsPageMocks = vi.hoisted(() => ({
@@ -110,9 +110,11 @@ describe("AnalyticsPage", () => {
     expect(client.query.select).toHaveBeenCalledWith(
       "agency_name,employee_id,employee_name,period_start,period_end,gross_amount,deductions_total,net_amount",
     );
-    expect(screen.getByText("Agence Nord")).toBeTruthy();
-    expect(screen.getByText("Employee One")).toBeTruthy();
-    expect(screen.getByText("EMP-001")).toBeTruthy();
+    // The agency also labels the distribution chart; assert the detail table rows.
+    const table = within(screen.getByRole("table", { name: "Lignes analytics paie" }));
+    expect(table.getByText("Agence Nord")).toBeTruthy();
+    expect(table.getByText("Employee One")).toBeTruthy();
+    expect(table.getByText("EMP-001")).toBeTruthy();
     expect(analyticsPageMocks.recordAuditEvent).toHaveBeenCalledWith({
       action: "ANALYTICS_VIEWED",
       actorProfileId: "00000000-0000-0000-0000-000000000101",

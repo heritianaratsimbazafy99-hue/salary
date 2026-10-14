@@ -4,9 +4,18 @@ function joinClasses(...classes: Array<string | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function Table({ className, ...props }: ComponentPropsWithoutRef<"table">) {
+export function Table({
+  className,
+  containerClassName,
+  ...props
+}: ComponentPropsWithoutRef<"table"> & { containerClassName?: string }) {
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-border bg-surface shadow-[var(--shadow-sm)]">
+    <div
+      className={joinClasses(
+        "w-full overflow-auto overscroll-x-contain rounded-3xl border border-border/80 bg-surface shadow-[var(--shadow-sm)]",
+        containerClassName,
+      )}
+    >
       <table
         className={joinClasses("min-w-full border-collapse text-left text-sm", className)}
         {...props}
@@ -18,7 +27,7 @@ export function Table({ className, ...props }: ComponentPropsWithoutRef<"table">
 export function TableHeader(props: ComponentPropsWithoutRef<"thead">) {
   return (
     <thead
-      className="bg-primary/[0.06] text-xs font-semibold uppercase tracking-wide text-primary"
+      className="sticky top-0 z-10 border-b border-border bg-surface-elevated/95 text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground backdrop-blur"
       {...props}
     />
   );
@@ -40,7 +49,7 @@ export function TableRow({ className, ...props }: ComponentPropsWithoutRef<"tr">
 export function TableHead({ className, ...props }: ComponentPropsWithoutRef<"th">) {
   return (
     <th
-      className={joinClasses("whitespace-nowrap px-4 py-3 font-semibold", className)}
+      className={joinClasses("whitespace-nowrap px-4 py-3.5 font-bold", className)}
       scope="col"
       {...props}
     />
@@ -48,5 +57,5 @@ export function TableHead({ className, ...props }: ComponentPropsWithoutRef<"th"
 }
 
 export function TableCell({ className, ...props }: ComponentPropsWithoutRef<"td">) {
-  return <td className={joinClasses("whitespace-nowrap px-4 py-3", className)} {...props} />;
+  return <td className={joinClasses("whitespace-nowrap px-4 py-3.5", className)} {...props} />;
 }

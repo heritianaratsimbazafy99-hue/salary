@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Download } from "lucide-react";
 import { ExportPanel } from "@/components/exports/ExportPanel";
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
@@ -19,5 +20,5 @@ export default async function ExportsPage() {
     throw error;
   }
   const agencies = await listAgencies();
-  return <AppShell role={actor.role}><div className="flex flex-col gap-8"><PageHeader eyebrow="Administration RH" title="Exports" description="Téléchargez les rapports d’import et les fiches publiées par agence et période." /><ExportPanel agencies={agencies.map(({ id, name }) => ({ id, name }))} /></div></AppShell>;
+  return <AppShell role={actor.role}><div className="flex flex-col gap-6 sm:gap-8"><PageHeader eyebrow="Administration RH" title="Exports" icon={Download} description="Téléchargez les rapports d’import et les fiches publiées par agence et période." /><ExportPanel agencies={agencies.map(({ id, name }) => ({ id, name }))} /></div></AppShell>;
 }

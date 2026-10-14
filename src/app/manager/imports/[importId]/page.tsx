@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ArrowLeft, Eye, FileSpreadsheet, Send, Shuffle } from "lucide-react";
+
 import { ExportDownload } from "@/components/exports/ExportDownload";
 import { notFound, redirect } from "next/navigation";
 
@@ -11,6 +14,8 @@ import { UploadStepper } from "@/components/imports/UploadStepper";
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Panel } from "@/components/ui/Surface";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
@@ -119,19 +124,31 @@ export default async function ImportDetailPage({ params }: PageProps) {
   const mappedColumns = await loadMappedColumns(supabase, actor.agencyId, allUnknownColumns);
   const unknownColumns = allUnknownColumns.filter((column) => !mappedColumns.has(column));
 
+  const isPublished = ["PUBLISHED", "SUPERSEDED"].includes(payrollImport.status);
+
   return (
     <AppShell role={actor.role}>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <Link
+          className="-mb-2 inline-flex w-fit items-center gap-1.5 rounded-lg text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          href="/manager/imports"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Tous les imports
+        </Link>
         <PageHeader
           eyebrow="Espace manager"
           title="Rapport d'import"
+          icon={FileSpreadsheet}
           description={`${payrollImport.sourceFilename} · ${payrollImport.periodStart} – ${payrollImport.periodEnd}`}
           actions={
             payrollImport.status === "READY_FOR_PREVIEW" ? (
               <PublishImportButton importId={payrollImport.id} />
-            ) : ["PUBLISHED", "SUPERSEDED"].includes(payrollImport.status) ? (
-              <div className="grid gap-4"><ResendInvitationsButton importId={payrollImport.id} /><RetryNotificationsButton importId={payrollImport.id} /></div>
-            ) : undefined
+            ) : (
+              <span className="rounded-full bg-surface p-1 shadow-[var(--shadow-sm)]">
+                <StatusBadge status={payrollImport.status} />
+              </span>
+            )
           }
         />
 
@@ -143,29 +160,41 @@ export default async function ImportDetailPage({ params }: PageProps) {
           validRowCount={payrollImport.validRowCount}
         />
 
-        {payrollImport.status === "NEEDS_MAPPING" ? (
-          <section aria-labelledby="mapping-title" className="grid gap-4">
-            <div>
-              <h2 className="font-display text-base font-semibold" id="mapping-title">
-                Mapping des colonnes
-              </h2>
+        {isPublished ? (
+          <Panel
+            icon={Send}
+            tone="teal"
+            title="Après publication"
+            description="Relancez les salariés qui n'ont pas encore reçu ou ouvert leur accès."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <ResendInvitationsButton importId={payrollImport.id} />
+              <RetryNotificationsButton importId={payrollImport.id} />
             </div>
-            <ColumnMappingForm importId={payrollImport.id} unknownColumns={unknownColumns} />
-          </section>
+          </Panel>
         ) : null}
 
-        <section aria-labelledby="preview-title" className="grid gap-4">
-          <div>
-            <h2 className="font-display text-base font-semibold" id="preview-title">
-              Previsualisation
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Apercu des lignes valides rattachees a cet import.
-            </p>
-          </div>
-          <ExportDownload agencyId={payrollImport.agencyId} importId={payrollImport.id} exportType="IMPORT_REPORT" />
+        {payrollImport.status === "NEEDS_MAPPING" ? (
+          <Panel
+            icon={Shuffle}
+            tone="amber"
+            title="Mapping des colonnes"
+            titleId="mapping-title"
+            description="Indiquez à quoi correspond chaque colonne inconnue du fichier. Ce choix est mémorisé pour les prochains imports de l'agence."
+          >
+            <ColumnMappingForm importId={payrollImport.id} unknownColumns={unknownColumns} />
+          </Panel>
+        ) : null}
+
+        <Panel
+          icon={Eye}
+          title="Previsualisation"
+          titleId="preview-title"
+          description="Apercu des lignes valides rattachees a cet import."
+          actions={<ExportDownload agencyId={payrollImport.agencyId} importId={payrollImport.id} exportType="IMPORT_REPORT" />}
+        >
           <PayslipPreviewTable rows={previewRows} importId={payrollImport.status === "READY_FOR_PREVIEW" ? payrollImport.id : undefined} />
-        </section>
+        </Panel>
       </div>
     </AppShell>
   );

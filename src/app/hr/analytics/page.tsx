@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { BarChart3 } from "lucide-react";
 
 import { PayrollAnalytics } from "@/components/analytics/PayrollAnalytics";
 import { AccessDenied } from "@/components/shell/AccessDenied";
@@ -44,10 +45,11 @@ export default async function AnalyticsPage() {
 
   return (
     <AppShell role={actor.role}>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 sm:gap-8">
         <PageHeader
           eyebrow="Administration RH"
           title="Analytics paie"
+          icon={BarChart3}
           description="Analyse détaillée des données de paie publiées sur l'ensemble des agences."
         />
         <PayrollAnalytics rows={rows} />

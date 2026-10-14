@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+
+import { buttonClasses } from "@/components/ui/Button";
 
 export function DownloadPayslipPdfButton({ payslipId }: { payslipId: string }) {
   const [pending, setPending] = useState(false);
@@ -32,9 +34,9 @@ export function DownloadPayslipPdfButton({ payslipId }: { payslipId: string }) {
   }
 
   return <div className="grid gap-2">
-    <a href={`/api/employee/payslips/${encodeURIComponent(payslipId)}/pdf`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60" aria-disabled={pending} onClick={(event) => { event.preventDefault(); if (!pending) void download(); }}>
-      <Download aria-hidden="true" className="size-4" />{pending ? "Préparation…" : "Télécharger PDF"}
+    <a href={`/api/employee/payslips/${encodeURIComponent(payslipId)}/pdf`} className={buttonClasses({ variant: "primary" })} aria-disabled={pending} onClick={(event) => { event.preventDefault(); if (!pending) void download(); }}>
+      {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Download aria-hidden="true" className="size-4" />}{pending ? "Préparation…" : "Télécharger PDF"}
     </a>
-    {error ? <p role="alert" className="max-w-sm text-sm text-danger">{error}</p> : null}
+    {error ? <p role="alert" className="max-w-sm rounded-xl bg-danger/[0.06] px-3 py-2 text-sm text-danger">{error}</p> : null}
   </div>;
 }

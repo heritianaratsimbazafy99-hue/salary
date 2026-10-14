@@ -2,8 +2,23 @@
 
 import { useState, type FormEvent } from "react";
 
+import { ArrowRight, CheckCircle2, Columns3, Loader2, Save } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
+import { fieldClass } from "@/components/ui/Input";
 import { PAY_ITEM_CATEGORIES } from "@/lib/payroll/schema";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  BASE_PAY: "Salaire de base",
+  HOURS: "Heures",
+  OVERTIME: "Heures supplémentaires",
+  BONUS: "Prime",
+  ABSENCE: "Absence",
+  DEDUCTION: "Retenue",
+  BENEFIT: "Avantage / indemnité",
+  INFORMATIONAL_NOTE: "Note informative",
+  OTHER_ELEMENTS: "Autre élément",
+};
 
 type Props = {
   importId: string;
@@ -16,7 +31,12 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
   const [hasError, setHasError] = useState(false);
 
   if (unknownColumns.length === 0) {
-    return <p className="text-sm text-muted-foreground">Toutes les colonnes sont reconnues.</p>;
+    return (
+      <p className="flex items-center gap-2 rounded-2xl bg-success/[0.07] px-4 py-3 text-sm font-medium text-success">
+        <CheckCircle2 className="size-4" aria-hidden="true" />
+        Toutes les colonnes sont reconnues.
+      </p>
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -63,36 +83,47 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
+    <form className="grid gap-4" onSubmit={handleSubmit}>
       {unknownColumns.map((column, index) => {
         const labelId = `mapping-${index}-label`;
         const categoryId = `mapping-${index}-category`;
         const fieldName = `mappings.${index}`;
 
         return (
-          <fieldset key={column} className="grid gap-2 rounded-xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)] md:grid-cols-3">
-            <legend className="px-1 font-display text-sm font-semibold">{column}</legend>
+          <fieldset
+            aria-label={`Colonne ${column}`}
+            key={column}
+            className="grid min-w-0 items-end gap-3 rounded-2xl border border-border bg-surface-elevated p-4 md:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1fr)_minmax(0,1fr)]"
+          >
             <input name={`${fieldName}.sourceColumn`} type="hidden" value={column} />
-            <label className="text-sm" htmlFor={labelId}>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Colonne du fichier</p>
+              <p className="mt-2 flex h-11 items-center gap-2 rounded-xl border border-amber/30 bg-amber/10 px-3 font-mono text-sm font-semibold text-amber-foreground">
+                <Columns3 className="size-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{column}</span>
+              </p>
+            </div>
+            <ArrowRight className="mb-3 hidden size-5 text-muted-foreground md:block" aria-hidden="true" />
+            <label className="grid min-w-0 gap-2 text-sm font-medium" htmlFor={labelId}>
               Libelle
               <input
-                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25"
+                className={fieldClass}
                 defaultValue={column}
                 id={labelId}
                 name={`${fieldName}.displayLabel`}
               />
             </label>
-            <label className="text-sm" htmlFor={categoryId}>
+            <label className="grid min-w-0 gap-2 text-sm font-medium" htmlFor={categoryId}>
               Categorie
               <select
-                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25"
+                className={fieldClass}
                 id={categoryId}
                 name={`${fieldName}.targetCategory`}
                 defaultValue="OTHER_ELEMENTS"
               >
                 {PAY_ITEM_CATEGORIES.map((category) => (
                   <option key={category} value={category}>
-                    {category}
+                    {CATEGORY_LABELS[category] ?? category}
                   </option>
                 ))}
               </select>
@@ -100,8 +131,9 @@ export function ColumnMappingForm({ importId, unknownColumns }: Props) {
           </fieldset>
         );
       })}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button disabled={isSubmitting} type="submit">
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
           {isSubmitting ? "Enregistrement" : "Enregistrer les mappings"}
         </Button>
         {message ? (

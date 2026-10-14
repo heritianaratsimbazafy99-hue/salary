@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { FileSpreadsheet, FileText, Loader2, Sheet } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ExportType } from "@/lib/payroll/export";
+
+const FORMAT_ICON = { csv: Sheet, xlsx: FileSpreadsheet, pdf: FileText } as const;
+const FORMAT_TONE = { csv: "text-teal", xlsx: "text-success", pdf: "text-danger" } as const;
 
 type Props = {
   agencyId?: string;
@@ -46,12 +49,15 @@ export function ExportDownload({ agencyId, importId, exportType = "IMPORT_REPORT
   }
   const formats = allowPdf && exportType === "PUBLISHED_PAYSLIPS" ? (["csv", "xlsx", "pdf"] as const) : (["csv", "xlsx"] as const);
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
-        {formats.map((format) => <Button key={format} variant="secondary" disabled={pending !== null} onClick={() => void download(format)}><Download size={16} aria-hidden="true" />{pending === format ? "Préparation…" : `Télécharger ${format.toUpperCase()}`}</Button>)}
+        {formats.map((format) => {
+          const Icon = FORMAT_ICON[format];
+          return <Button key={format} variant="secondary" disabled={pending !== null} onClick={() => void download(format)}>{pending === format ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Icon className={`size-4 ${FORMAT_TONE[format]}`} aria-hidden="true" />}{pending === format ? "Préparation…" : `Télécharger ${format.toUpperCase()}`}</Button>;
+        })}
       </div>
-      {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
-      <p role="status" className="text-sm text-muted-foreground">{success}</p>
+      {error ? <p role="alert" className="rounded-xl bg-danger/[0.06] px-3 py-2 text-sm text-danger">{error}</p> : null}
+      <p role="status" className="text-sm text-success empty:hidden">{success}</p>
     </div>
   );
 }
