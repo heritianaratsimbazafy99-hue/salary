@@ -30,7 +30,7 @@ if docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -X -v
   echo 'FAIL: canonical collision accepted' >&2
   exit 1
 fi
-rg -q 'employee_matricule_collision: manual identity review required' "$identity_tmp/collision.log"
+grep -q 'employee_matricule_collision: manual identity review required' "$identity_tmp/collision.log"
 # A failed psql connection rolls back the outer transaction, including all DDL.
 docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 -c "do \$\$ begin if exists(select 1 from public.agencies where id='b1000000-0000-4000-8000-000000000001') then raise exception 'migration fixtures survived'; end if; if private.canonical_employee_id('ab-001') <> 'AB-001' then raise exception 'schema rollback failed'; end if; end \$\$;"
 echo 'PASS: legacy normalization and collision refusal; all fixtures and DDL rolled back'
