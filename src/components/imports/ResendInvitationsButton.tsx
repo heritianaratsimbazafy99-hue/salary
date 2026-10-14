@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { MailPlus, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
 
 const subscribeToHydration = () => () => {};
@@ -33,12 +35,17 @@ export function ResendInvitationsButton({ importId }: { importId: string }) {
   }
 
   return (
-    <div className="grid gap-2">
-      <Button disabled={!isHydrated || isSending} onClick={resend} variant="secondary">
+    <div className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface-elevated p-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal/12 text-teal"><MailPlus className="size-5" aria-hidden="true" /></span>
+        <p className="font-display text-sm font-semibold">Invitations en attente</p>
+      </div>
+      <p className="max-w-lg text-sm leading-6 text-muted-foreground">Pour les salariés qui n’ont pas encore activé leur compte. Les anciens liens seront remplacés.</p>
+      <Button className="mt-auto" disabled={!isHydrated || isSending} onClick={resend} variant="secondary">
+        {isSending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {isSending ? "Envoi en cours…" : "Renvoyer les invitations"}
       </Button>
-      <p className="max-w-lg text-sm text-muted-foreground">Pour les salariés qui n’ont pas encore activé leur compte. Les anciens liens seront remplacés.</p>
-      {message ? <p className={`max-w-lg text-sm ${hasError ? "text-danger" : "text-muted-foreground"}`} role={hasError ? "alert" : "status"}>{message}</p> : null}
+      {message ? <p className={`max-w-lg rounded-xl px-3 py-2 text-sm leading-6 ${hasError ? "bg-danger/[0.06] text-danger" : "bg-success/[0.07] text-foreground"}`} role={hasError ? "alert" : "status"}>{message}</p> : null}
     </div>
   );
 }

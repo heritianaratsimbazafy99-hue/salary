@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 
 import { activateEmployee } from "./actions";
 
@@ -32,9 +33,12 @@ export function ActivationForm({ token }: { token: string }) {
       ) : null}
       <div className="grid gap-2">
         <label className="text-sm font-medium" htmlFor="invitation-email">Email professionnel</label>
+        <div className="relative">
+        <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <input
           autoComplete="email"
-          className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+          placeholder="nom@entreprise.com"
+          className="h-13 w-full rounded-xl border border-border bg-background pl-11 pr-3 text-base outline-none transition hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:opacity-60"
           id="invitation-email"
           name="email"
           type="email"
@@ -42,13 +46,16 @@ export function ActivationForm({ token }: { token: string }) {
           required
           disabled={pending || unavailable}
         />
+        </div>
       </div>
       <button
-        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className="group inline-flex min-h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground shadow-[var(--shadow-md)] transition hover:-translate-y-px hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         disabled={pending || unavailable}
       >
+        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {pending ? "Envoi en cours…" : state.status === "sent" ? "Renvoyer le lien de vérification" : "Recevoir mon lien d’activation"}
+        {pending ? null : <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
       </button>
       <p className="text-xs leading-5 text-muted-foreground">
         Le lien est valable 15 minutes. Vérifiez aussi vos courriers indésirables. Chaque nouveau lien remplace le précédent.

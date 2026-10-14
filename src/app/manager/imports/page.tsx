@@ -1,20 +1,27 @@
 import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  CircleAlert,
+  FileSpreadsheet,
+  FileUp,
+  History,
+  Inbox,
+  Layers,
+  Rows3,
+  UploadCloud,
+} from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { PayrollImportUploadForm } from "@/components/imports/PayrollImportUploadForm";
 import { UploadStepper } from "@/components/imports/UploadStepper";
 import { AccessDenied } from "@/components/shell/AccessDenied";
 import { AppShell } from "@/components/shell/AppShell";
-import { PageHeader } from "@/components/shell/PageHeader";
+import { HeaderStat, PageHeader } from "@/components/shell/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/Table";
+import { buttonClasses } from "@/components/ui/Button";
+import { EmptyState, Panel } from "@/components/ui/Surface";
 import { getCurrentAgencyScopedActor } from "@/lib/admin/auth";
 import {
   AUTH_REQUIRED_ERROR_MESSAGE,
@@ -56,76 +63,132 @@ export default async function ManagerImportsPage() {
   const supabase = await createClient();
   const imports = await loadManagerImports(supabase, actor.agencyId);
 
+  const toProcess = imports.filter((item) => item.status === "NEEDS_MAPPING" || item.status === "READY_FOR_PREVIEW").length;
+  const published = imports.filter((item) => item.status === "PUBLISHED").length;
+  const validRows = imports.reduce((sum, item) => sum + item.validRowCount, 0);
+
   return (
     <AppShell role={actor.role}>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 sm:gap-8">
         <PageHeader
           eyebrow="Espace manager"
           title="Imports de paie"
+          icon={FileUp}
           description="Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence."
-        />
-
-        <UploadStepper currentStep={0} />
-        <PayrollImportUploadForm agencyId={actor.agencyId} />
-
-        <section aria-labelledby="manager-imports-list-title" className="grid gap-4">
-          <div>
-            <h2 className="font-display text-base font-semibold" id="manager-imports-list-title">
-              Derniers imports
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Les donnees affichees sont limitees a votre agence.
-            </p>
+          actions={
+            <Link className={buttonClasses({ variant: "secondary" })} href="/api/payroll-template" prefetch={false}>
+              <FileSpreadsheet className="size-4" aria-hidden="true" />
+              Modèle Excel
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <HeaderStat icon={Layers} label="Imports" value={imports.length} />
+            <HeaderStat icon={CircleAlert} label="À traiter" value={toProcess} />
+            <HeaderStat icon={CheckCircle2} label="Publiés" value={published} />
+            <HeaderStat icon={Rows3} label="Lignes valides" value={validRows.toLocaleString("fr-MG")} />
           </div>
+        </PageHeader>
 
-          {imports.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fichier</TableHead>
-                  <TableHead>Periode</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Lignes</TableHead>
-                  <TableHead>Erreurs</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <Panel
+            icon={UploadCloud}
+            title="Nouvel import"
+            description="Trois étapes : choisissez la période, déposez le fichier, puis contrôlez le rapport avant publication."
+          >
+            <div className="grid gap-5">
+              <UploadStepper bare currentStep={0} />
+              <PayrollImportUploadForm agencyId={actor.agencyId} />
+            </div>
+          </Panel>
+
+          <Panel
+            icon={History}
+            tone="teal"
+            title="Derniers imports"
+            titleId="manager-imports-list-title"
+            description="Les donnees affichees sont limitees a votre agence."
+          >
+            {imports.length > 0 ? (
+              <ul className="stagger grid grid-cols-1 gap-3">
                 {imports.map((payrollImport) => (
-                  <TableRow key={payrollImport.id}>
-                    <TableCell className="max-w-72 whitespace-normal break-words font-medium text-foreground">
-                      {payrollImport.sourceFilename}
-                      <span className="block text-xs text-muted-foreground">
-                        {formatDateTime(payrollImport.createdAt)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {payrollImport.periodStart} - {payrollImport.periodEnd}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={payrollImport.status} />
-                    </TableCell>
-                    <TableCell>{payrollImport.validRowCount}</TableCell>
-                    <TableCell>
-                      {payrollImport.invalidRowCount + payrollImport.unknownEmployeeCount}
-                    </TableCell>
-                    <TableCell>
-                      <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href={`/manager/imports/${payrollImport.id}`}>
-                        Ouvrir
-                      </Link>
-                    </TableCell>
-                  </TableRow>
+                  <ImportCard key={payrollImport.id} item={payrollImport} />
                 ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-              Aucun import n&apos;a encore ete charge pour votre agence.
-            </p>
-          )}
-        </section>
+              </ul>
+            ) : (
+              <EmptyState
+                headingLevel={3}
+                icon={Inbox}
+                title="Aucun import"
+                description="Aucun import n'a encore ete charge pour votre agence."
+              />
+            )}
+          </Panel>
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+const NEXT_STEP: Record<string, string> = {
+  NEEDS_MAPPING: "Classez les colonnes inconnues",
+  READY_FOR_PREVIEW: "Vérifiez puis publiez",
+  PUBLISHED: "Fiches en ligne",
+  SUPERSEDED: "Remplacé par un import plus récent",
+  FAILED: "Import à recommencer",
+  UPLOADED: "Analyse en cours",
+};
+
+function ImportCard({ item }: { item: ManagerImportListItem }) {
+  const errors = item.invalidRowCount + item.unknownEmployeeCount;
+  const total = item.validRowCount + errors;
+  const needsAction = item.status === "NEEDS_MAPPING" || item.status === "READY_FOR_PREVIEW";
+
+  return (
+    <li
+      className={`group relative rounded-2xl border bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] ${
+        needsAction ? "border-amber/40 bg-amber/[0.03]" : "border-border"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+          <FileSpreadsheet className="size-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="min-w-0 break-all text-sm font-semibold text-foreground">{item.sourceFilename}</p>
+            <StatusBadge status={item.status} />
+          </div>
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays className="size-3.5" aria-hidden="true" />
+              {item.periodStart} - {item.periodEnd}
+            </span>
+            <span>{formatDateTime(item.createdAt)}</span>
+          </p>
+          <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <span className="chart-bar h-full bg-success" style={{ width: `${total ? (item.validRowCount / total) * 100 : 0}%` }} />
+            <span className="chart-bar h-full bg-danger/70" style={{ width: `${total ? (errors / total) * 100 : 0}%` }} />
+          </div>
+          <p className={`mt-2 text-xs font-semibold ${needsAction ? "text-amber-foreground" : "text-muted-foreground"}`}>
+            {NEXT_STEP[item.status] ?? ""}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-success">{item.validRowCount}</span> lignes valides ·{" "}
+              <span className={`font-semibold ${errors ? "text-danger" : "text-muted-foreground"}`}>{errors}</span> erreur(s)
+            </span>
+            <Link
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-primary transition-colors after:absolute after:inset-0 after:rounded-2xl hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              href={`/manager/imports/${item.id}`}
+            >
+              Ouvrir
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
 

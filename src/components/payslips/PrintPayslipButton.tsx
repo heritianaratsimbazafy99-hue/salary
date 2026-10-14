@@ -2,10 +2,12 @@
 
 import { Printer } from "lucide-react";
 
+import { buttonClasses } from "@/components/ui/Button";
+
 export function PrintPayslipButton() {
   return (
     <button
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className={buttonClasses({ variant: "secondary" })}
       onClick={() => window.print()}
       type="button"
     >

@@ -3,11 +3,13 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
   Building2,
+  ChevronDown,
   Clock,
   Download,
   Eye,
   FileText,
   Fingerprint,
+  HelpCircle,
   History,
   KeyRound,
   Lock,
@@ -22,6 +24,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { HeroShowcase } from "@/components/marketing/HeroShowcase";
 import { SiteHeader } from "@/components/marketing/SiteHeader";
 import { Reveal } from "@/components/marketing/Reveal";
+import { RoleShowcase } from "@/components/marketing/RoleShowcase";
 
 type Tint = "teal" | "accent" | "amber" | "primary";
 
@@ -84,27 +87,6 @@ const TRUST: Array<{ title: string; description: string; icon: LucideIcon }> = [
   },
 ];
 
-const EMPLOYEE_FEATURES: Array<{ title: string; description: string; icon: LucideIcon; tint: Tint }> = [
-  {
-    title: "Tout est clair",
-    description: "Brut, net, retenues et primes présentés simplement, sans jargon.",
-    icon: Wallet,
-    tint: "teal",
-  },
-  {
-    title: "Disponible à tout moment",
-    description: "Votre espace est accessible jour et nuit, depuis votre téléphone ou votre ordinateur.",
-    icon: Clock,
-    tint: "amber",
-  },
-  {
-    title: "Téléchargeable",
-    description: "Récupérez vos fiches quand vous en avez besoin, pour un crédit, un bail ou vos archives.",
-    icon: Download,
-    tint: "primary",
-  },
-];
-
 const REASSURANCE: Array<{ value: string; label: string; icon: LucideIcon; tint: Tint }> = [
   { value: "100 %", label: "Confidentiel par défaut", icon: Eye, tint: "teal" },
   { value: "0", label: "Mot de passe à retenir", icon: Fingerprint, tint: "accent" },
@@ -126,9 +108,10 @@ export default function HomePage() {
         <Hero />
         <ReassuranceStrip />
         <ParcoursSection />
-        <SecuritySection />
+        <RolesSection />
         <FeaturesSection />
-        <TeamsSection />
+        <SecuritySection />
+        <FaqSection />
         <FinalCta />
       </main>
       <SiteFooter />
@@ -159,8 +142,8 @@ function Hero() {
             className="mt-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-tight text-balance text-foreground sm:text-6xl"
           >
             Vos fiches de paie,
-            <span className="relative whitespace-nowrap text-primary">
-              {" "}en clair{" "}
+            <span className="relative whitespace-nowrap">
+              {" "}<span className="text-gradient">en clair</span>{" "}
               <svg
                 aria-hidden="true"
                 viewBox="0 0 300 12"
@@ -220,6 +203,24 @@ function Hero() {
               <Fingerprint className="size-4 text-teal" aria-hidden="true" />
               Connexion par lien magique
             </span>
+          </Reveal>
+
+          <Reveal delay={300} className="mt-8 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Je suis</span>
+            {[
+              { label: "Salarié", icon: Wallet },
+              { label: "Manager d'agence", icon: Building2 },
+              { label: "RH centrale", icon: ShieldCheck },
+            ].map((item) => (
+              <a
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border bg-surface/80 px-3.5 text-sm font-semibold text-foreground shadow-[var(--shadow-xs)] backdrop-blur transition hover:-translate-y-px hover:border-primary/30 hover:shadow-[var(--shadow-sm)]"
+                href="#equipes"
+                key={item.label}
+              >
+                <item.icon className="size-4 text-primary" aria-hidden="true" />
+                {item.label}
+              </a>
+            ))}
           </Reveal>
         </div>
 
@@ -362,103 +363,177 @@ function SecuritySection() {
   );
 }
 
-function FeaturesSection() {
+function RolesSection() {
   return (
-    <section className="px-5 py-20 sm:px-6 md:py-24">
+    <section className="relative overflow-hidden px-5 py-20 sm:px-6 md:py-24" id="equipes">
+      <div aria-hidden="true" className="brand-mesh pointer-events-none absolute inset-0 -z-10 opacity-70" />
       <div className="mx-auto max-w-7xl">
-        <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-          <div className="max-w-md">
-            <Reveal as="h2" className="font-display text-3xl font-bold tracking-tight text-balance sm:text-4xl">
-              Un espace qui va à
-              <span className="text-teal"> l&apos;essentiel.</span>
-            </Reveal>
-            <Reveal as="p" delay={80} className="mt-4 text-base leading-7 text-muted-foreground">
-              Pas de tableaux de bord surchargés. Juste vos fiches, lisibles et disponibles
-              quand vous en avez besoin.
-            </Reveal>
-            <Reveal delay={180}>
-              <Link
-                className="group mt-7 inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary-strong"
-                href="/auth/login"
-              >
-                Ouvrir mon espace
-                <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
-            </Reveal>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            {EMPLOYEE_FEATURES.map((feature, index) => (
-              <Reveal delay={index * 100} key={feature.title}>
-                <article className="group h-full rounded-2xl border border-border bg-surface p-6 transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[var(--shadow-md)]">
-                  <span className={`flex size-12 items-center justify-center rounded-xl ${tintTile[feature.tint]} transition-transform duration-300 group-hover:-translate-y-0.5`}>
-                    <feature.icon className="size-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-5 font-display text-base font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
+        <SectionHeading
+          title="Une plateforme, trois espaces."
+          description="Votre rôle ouvre automatiquement le bon espace. Chacun ne voit que ce qui le concerne."
+        />
+        <RoleShowcase />
       </div>
     </section>
   );
 }
 
-/** Secondary read for HR / managers — present, but not dominating. */
-function TeamsSection() {
-  const items: Array<{ title: string; description: string; icon: LucideIcon; tint: Tint }> = [
-    {
-      title: "Managers d'agence",
-      description: "Importez les fichiers de paie, contrôlez les écarts et publiez par période.",
-      icon: Building2,
-      tint: "teal",
-    },
-    {
-      title: "RH centrale",
-      description: "Vue multi-agences, journal d'audit des actions sensibles et analyses consolidées.",
-      icon: ShieldCheck,
-      tint: "primary",
-    },
-  ];
-
+function FeaturesSection() {
   return (
-    <section className="px-5 py-6 sm:px-6" id="equipes">
+    <section className="px-5 py-20 sm:px-6 md:py-24" id="fonctionnalites">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-border bg-surface px-6 py-12 shadow-[var(--shadow-sm)] sm:px-10">
-          <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-lg">
-              <Reveal className="inline-flex items-center gap-2 rounded-full border border-teal/25 bg-teal/10 px-3 py-1 text-xs font-bold text-teal">
-                <Building2 className="size-3.5" aria-hidden="true" />
-                Côté équipes
-              </Reveal>
-              <Reveal as="h2" delay={60} className="mt-4 font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
-                Et pour les équipes RH &amp; managers ?
-              </Reveal>
-              <Reveal as="p" delay={120} className="mt-4 text-sm leading-6 text-muted-foreground">
-                Le même outil gère l&apos;import, le contrôle et la publication de la paie, avec
-                des accès séparés par périmètre. La connexion est commune : votre rôle ouvre le bon
-                espace.
-              </Reveal>
-            </div>
+        <SectionHeading
+          title="Un espace qui va à l'essentiel."
+          description="Pas de tableaux de bord surchargés. Juste vos fiches, lisibles et disponibles quand vous en avez besoin."
+        />
+        <div className="mt-14 grid gap-4 md:grid-cols-6">
+          <Reveal className="md:col-span-4">
+            <article className="group relative h-full overflow-hidden rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-sm)] transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-md)] sm:p-8">
+              <span className={`flex size-12 items-center justify-center rounded-xl ${tintTile.teal}`}>
+                <Wallet className="size-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-5 font-display text-xl font-semibold">Tout est clair</h3>
+              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                Brut, net, retenues et primes présentés simplement, sans jargon — avec la part de
+                chaque élément en un coup d&apos;œil.
+              </p>
+              <div aria-hidden="true" className="mt-7 grid gap-3">
+                <div className="flex h-4 overflow-hidden rounded-full bg-muted">
+                  <span className="chart-bar h-full w-[78%] bg-gradient-to-r from-primary to-teal" />
+                  <span className="chart-bar h-full w-[14%] border-l-2 border-surface bg-amber" style={{ animationDelay: "120ms" }} />
+                  <span className="chart-bar h-full w-[8%] border-l-2 border-surface bg-danger/70" style={{ animationDelay: "240ms" }} />
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-teal" />Net perçu</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-amber" />Cotisations</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-danger/70" />Impôt</span>
+                </div>
+              </div>
+            </article>
+          </Reveal>
+          <Reveal delay={80} className="md:col-span-2">
+            <article className="relative h-full overflow-hidden rounded-[1.75rem] bg-ink p-6 text-ink-foreground shadow-[var(--shadow-md)] sm:p-8">
+              <div aria-hidden="true" className="brand-mesh-dark pointer-events-none absolute inset-0" />
+              <div className="relative">
+                <span className="flex size-12 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                  <Clock className="size-5" aria-hidden="true" />
+                </span>
+                <p className="mt-5 font-display text-5xl font-bold tracking-tight">24/7</p>
+                <h3 className="mt-2 font-display text-lg font-semibold">Disponible à tout moment</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  Depuis votre téléphone ou votre ordinateur, de jour comme de nuit.
+                </p>
+              </div>
+            </article>
+          </Reveal>
+          <Reveal delay={120} className="md:col-span-3">
+            <article className="h-full rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-sm)] transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-md)] sm:p-8">
+              <span className={`flex size-12 items-center justify-center rounded-xl ${tintTile.primary}`}>
+                <Download className="size-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-5 font-display text-lg font-semibold">Téléchargeable</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Récupérez vos fiches quand vous en avez besoin, pour un crédit, un bail ou vos archives.
+              </p>
+              <div aria-hidden="true" className="mt-6 flex flex-wrap gap-2">
+                {[["PDF", "bg-danger/10 text-danger"], ["CSV", "bg-success/12 text-success"], ["Impression", "bg-primary/10 text-primary"]].map(([label, tone]) => (
+                  <span className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold ${tone}`} key={label}>
+                    <FileText className="size-3.5" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </article>
+          </Reveal>
+          <Reveal delay={160} className="md:col-span-3">
+            <article className="h-full rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-sm)] transition duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-md)] sm:p-8">
+              <span className={`flex size-12 items-center justify-center rounded-xl ${tintTile.amber}`}>
+                <History className="size-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-5 font-display text-lg font-semibold">Un an d&apos;historique</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Chaque fiche publiée reste consultable pendant un an, classée par période.
+              </p>
+              <div aria-hidden="true" className="mt-6 flex h-16 items-end gap-1.5">
+                {[48, 56, 52, 60, 58, 66, 62, 70, 68, 74, 72, 84].map((value, index) => (
+                  <span
+                    className={`chart-col flex-1 rounded-t ${index === 11 ? "bg-gradient-to-b from-amber to-primary" : "bg-amber/30"}`}
+                    key={index}
+                    style={{ height: `${value}%`, animationDelay: `${index * 40}ms` }}
+                  />
+                ))}
+              </div>
+            </article>
+          </Reveal>
+        </div>
+        <Reveal delay={200} className="mt-10 flex justify-center">
+          <Link
+            className="group inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-primary transition hover:bg-primary/[0.06] hover:text-primary-strong"
+            href="/auth/login"
+          >
+            Ouvrir mon espace
+            <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden="true" />
+          </Link>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
 
-            <div className="grid w-full max-w-xl gap-4 sm:grid-cols-2">
-              {items.map((item, index) => (
-                <Reveal delay={index * 100} key={item.title}>
-                  <article className="flex h-full gap-4 rounded-2xl border border-border bg-surface-elevated p-5">
-                    <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${tintTile[item.tint]}`}>
-                      <item.icon className="size-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <h3 className="font-display text-sm font-semibold">{item.title}</h3>
-                      <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{item.description}</p>
-                    </div>
-                  </article>
-                </Reveal>
-              ))}
-            </div>
-          </div>
+const FAQ: Array<{ question: string; answer: string }> = [
+  {
+    question: "Dois-je créer un mot de passe ?",
+    answer: "Non. Vous saisissez votre adresse professionnelle et recevez un lien de connexion à usage unique. Rien à mémoriser.",
+  },
+  {
+    question: "Mon lien de connexion ne fonctionne plus, que faire ?",
+    answer: "Les liens sont valables un court instant et un nouveau lien remplace le précédent. Demandez-en simplement un nouveau depuis la page de connexion et ouvrez-le dans le même navigateur.",
+  },
+  {
+    question: "Combien de temps mes fiches restent-elles disponibles ?",
+    answer: "Chaque fiche reste consultable pendant un an à compter de sa publication. Pensez à télécharger celles que vous souhaitez conserver.",
+  },
+  {
+    question: "Qui peut voir ma fiche de paie ?",
+    answer: "Vous seul dans votre espace salarié. Les équipes RH et managers n'accèdent qu'aux données de leur périmètre, et leurs actions sensibles sont journalisées.",
+  },
+  {
+    question: "Cette fiche remplace-t-elle mon bulletin officiel ?",
+    answer: "MadajobPay diffuse des fiches internes issues d'une paie déjà validée par votre employeur. Il ne calcule pas les obligations réglementaires de paie.",
+  },
+];
+
+function FaqSection() {
+  return (
+    <section className="px-5 py-20 sm:px-6 md:py-24" id="faq">
+      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+        <div>
+          <Reveal className="inline-flex items-center gap-2 rounded-full border border-teal/25 bg-teal/10 px-3 py-1 text-xs font-bold text-teal">
+            <HelpCircle className="size-3.5" aria-hidden="true" />
+            Questions fréquentes
+          </Reveal>
+          <Reveal as="h2" delay={60} className="mt-4 font-display text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+            Vous vous posez la question ?
+          </Reveal>
+          <Reveal as="p" delay={120} className="mt-4 text-base leading-7 text-muted-foreground">
+            Les réponses aux questions les plus courantes. Le guide intégré détaille chaque étape une
+            fois connecté.
+          </Reveal>
+        </div>
+        <div className="grid gap-3">
+          {FAQ.map((item, index) => (
+            <Reveal delay={index * 60} key={item.question}>
+              <details className="group rounded-2xl border border-border bg-surface shadow-[var(--shadow-xs)] transition open:shadow-[var(--shadow-md)]">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 font-display text-base font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  {item.question}
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition group-open:bg-primary group-open:text-primary-foreground">
+                    <ChevronDown className="details-chevron size-4 transition-transform duration-300" aria-hidden="true" />
+                  </span>
+                </summary>
+                <p className="px-5 pb-5 text-sm leading-6 text-muted-foreground">{item.answer}</p>
+              </details>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
@@ -501,12 +576,35 @@ function FinalCta() {
 
 function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-surface px-5 py-10 sm:px-6">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
-        <BrandLogo />
-        <p className="text-center text-xs text-muted-foreground sm:text-right">
-          Plateforme interne de fiches de paie. Accès réservé aux collaborateurs invités.
-        </p>
+    <footer className="border-t border-border bg-surface px-5 pb-10 pt-14 sm:px-6">
+      <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="max-w-sm">
+          <BrandLogo />
+          <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            Plateforme interne de fiches de paie. Accès réservé aux collaborateurs invités.
+          </p>
+        </div>
+        <nav aria-label="Découvrir" className="grid content-start gap-3 text-sm">
+          <p className="font-display font-semibold">Découvrir</p>
+          <a className="text-muted-foreground transition hover:text-foreground" href="#parcours">Comment ça marche</a>
+          <a className="text-muted-foreground transition hover:text-foreground" href="#equipes">Les espaces</a>
+          <a className="text-muted-foreground transition hover:text-foreground" href="#securite">Sécurité</a>
+          <a className="text-muted-foreground transition hover:text-foreground" href="#faq">Questions fréquentes</a>
+        </nav>
+        <div className="grid content-start gap-3 text-sm">
+          <p className="font-display font-semibold">Accès</p>
+          <Link className="inline-flex items-center gap-2 text-muted-foreground transition hover:text-foreground" href="/auth/login">
+            <LogIn className="size-4" aria-hidden="true" />
+            Me connecter
+          </Link>
+          <p className="inline-flex items-center gap-2 text-muted-foreground">
+            <Lock className="size-4" aria-hidden="true" />
+            Données privées et chiffrées
+          </p>
+        </div>
+      </div>
+      <div className="mx-auto mt-10 max-w-7xl border-t border-border pt-6 text-xs text-muted-foreground">
+        © {new Date().getFullYear()} MadajobPay · Fiches internes issues d&apos;une paie validée.
       </div>
     </footer>
   );

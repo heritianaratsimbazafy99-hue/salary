@@ -8,8 +8,9 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 
 const NAV = [
   { href: "#parcours", label: "Comment ça marche" },
+  { href: "#equipes", label: "Espaces" },
   { href: "#securite", label: "Sécurité" },
-  { href: "#equipes", label: "RH & managers" },
+  { href: "#faq", label: "FAQ" },
 ];
 
 /**

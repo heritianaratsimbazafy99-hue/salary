@@ -1,5 +1,6 @@
 @media print {
   .shell {
+    display: block;
     min-height: auto;
     background: white;
     color: black;
