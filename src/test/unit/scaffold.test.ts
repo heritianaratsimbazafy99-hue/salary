@@ -40,9 +40,10 @@ describe("project scaffold", () => {
     expect(ciWorkflow).toContain("npm run db:advisors");
   });
 
-  it("uses the approved Excel parser dependency", () => {
+  it("pins the maintained Excel readers, including the official SheetJS release for binary XLS", () => {
     expect(packageJson.dependencies.exceljs).toBeDefined();
-    expect(packageJson.dependencies).not.toHaveProperty("xlsx");
+    // The obsolete npm-registry xlsx release must not be reintroduced.
+    expect(packageJson.dependencies.xlsx).toBe("https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz");
   });
 
   it("pins dependency versions explicitly", () => {

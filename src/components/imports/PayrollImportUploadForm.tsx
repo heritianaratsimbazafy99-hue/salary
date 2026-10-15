@@ -141,7 +141,7 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
         {...dragProps}
       >
         <input
-          accept=".xlsx"
+          accept=".xlsx,.xls"
           aria-describedby="import-file-hint"
           className="absolute inset-0 z-10 cursor-pointer opacity-0"
           id="file"
@@ -179,7 +179,7 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
               Fichier Excel (4 Mo maximum)
             </label>
             <p className="mt-1 text-sm text-muted-foreground" id="import-file-hint">
-              Glissez-déposez votre fichier .xlsx ici, ou touchez pour le choisir.
+              Glissez-déposez votre fichier .xlsx ou .xls ici, ou touchez pour le choisir.
             </p>
           </>
         )}
@@ -190,9 +190,20 @@ export function PayrollImportUploadForm({ agencyId }: { agencyId: string }) {
         ) : null}
       </div>
 
+      <div className="grid gap-2 text-xs leading-5 text-muted-foreground">
+        <p>
+          Formats reconnus : modèle standard (feuille « payroll »), Airtel (feuille « Recap global »)
+          et Huawei (feuille mensuelle). Sélectionnez la période correspondant à la paie du fichier.
+        </p>
+        <p>
+          Si l’email est absent, il est repris du dossier salarié de votre agence grâce au matricule.
+          Pour un salarié inconnu, créez d’abord son dossier RH ou ajoutez une colonne « email » au fichier.
+        </p>
+      </div>
+
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-muted-foreground">
-          Une ligne par salarié, une seule période par fichier. Les montants sont en ariary.
+          Les montants validés sont repris en ariary. Vérifiez le rapport et les destinataires avant de publier les fiches dans les espaces salariés.
         </p>
         <Button disabled={isUploading} size="lg" type="submit">
           {isUploading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <UploadCloud className="size-4" aria-hidden="true" />}

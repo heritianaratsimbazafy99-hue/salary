@@ -14,7 +14,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 const EXCEL_XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const EXCEL_COMPATIBLE_MIME_TYPES = new Set([EXCEL_XLSX_MIME_TYPE, "application/zip"]);
+const EXCEL_XLSX_MIME_TYPES = new Set([EXCEL_XLSX_MIME_TYPE, "application/zip", "application/octet-stream"]);
+const EXCEL_XLS_MIME_TYPES = new Set(["application/vnd.ms-excel", "application/octet-stream"]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!isExcelWorkbookFile(file)) {
-    return NextResponse.json(apiError("VALIDATION_ERROR", "A .xlsx Excel file is required"), {
+    return NextResponse.json(apiError("VALIDATION_ERROR", "Un fichier Excel .xlsx ou .xls est requis"), {
       status: 422,
     });
   }
@@ -216,10 +217,11 @@ function isUuid(value: string): boolean {
 
 function isExcelWorkbookFile(file: File): boolean {
   const filename = file.name.trim().toLowerCase();
-  if (!filename.endsWith(".xlsx")) return false;
-
   const mimeType = file.type.trim().toLowerCase();
-  return mimeType.length === 0 || EXCEL_COMPATIBLE_MIME_TYPES.has(mimeType);
+  const allowedMimeTypes = filename.endsWith(".xlsx")
+    ? EXCEL_XLSX_MIME_TYPES
+    : filename.endsWith(".xls") ? EXCEL_XLS_MIME_TYPES : null;
+  return allowedMimeTypes !== null && (mimeType.length === 0 || allowedMimeTypes.has(mimeType));
 }
 
 function isValidDateRange(periodStart: string, periodEnd: string): boolean {

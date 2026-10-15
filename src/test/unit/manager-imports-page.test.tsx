@@ -101,7 +101,7 @@ describe("ManagerImportsPage", () => {
     const fileInput = container.querySelector<HTMLInputElement>('input[name="file"]');
     expect(form).toBeTruthy();
     expect(agencyInput?.value).toBe(AGENCY_ID);
-    expect(fileInput?.accept).toBe(".xlsx");
+    expect(fileInput?.accept).toBe(".xlsx,.xls");
     expect(screen.getByRole("heading", { name: "Imports de paie" })).toBeTruthy();
     expect(screen.getByText(/paie-juin\.xlsx/)).toBeTruthy();
     expect(screen.getByRole("link", { name: /Ouvrir/ }).getAttribute("href")).toBe(
