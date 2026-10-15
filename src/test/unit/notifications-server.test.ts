@@ -8,13 +8,13 @@ vi.mock("resend", () => ({
   },
 }));
 vi.mock("@/lib/env.server", () => ({
-  serverEnv: { RESEND_API_KEY: "test-key", RESEND_FROM_EMAIL: "payroll@example.com" },
+  serverEnv: { RESEND_API_KEY: "test-key", RESEND_FROM_EMAIL: "payroll@example.com", RESEND_REPLY_TO_EMAIL: "support@example.com" },
 }));
 vi.mock("@/lib/env.public", () => ({
   publicEnv: { NEXT_PUBLIC_APP_URL: "https://salary.example.com" },
 }));
 
-import { sendEmployeeActivationEmail, sendPayslipPublishedEmail } from "@/lib/notifications/resend-server";
+import { sendEmployeeActivationEmail, sendPayslipPublishedEmail, sendHrNotificationEmail } from "@/lib/notifications/resend-server";
 
 describe("sendPayslipPublishedEmail", () => {
   beforeEach(() => { resendMocks.send.mockReset(); vi.useFakeTimers(); });
@@ -27,6 +27,8 @@ describe("sendPayslipPublishedEmail", () => {
     })).resolves.toEqual({ data: { id: "provider-id" }, error: null });
     expect(resendMocks.send).toHaveBeenCalledWith(expect.objectContaining({
       to: "worker@example.com",
+      from: "payroll@example.com",
+      replyTo: "support@example.com",
       html: expect.stringContaining("https://salary.example.com/auth/invitation?token=personal-token"),
     }), expect.objectContaining({ idempotencyKey: expect.any(String) }));
   });
@@ -51,6 +53,8 @@ describe("sendEmployeeActivationEmail", () => {
     })).resolves.toEqual({ data: { id: "activation-id" }, error: null });
     expect(resendMocks.send).toHaveBeenCalledWith(expect.objectContaining({
       to: "worker@example.com",
+      from: "payroll@example.com",
+      replyTo: "support@example.com",
       subject: "Confirmez votre accès à MadajobPay",
       html: expect.stringContaining('href="https://salary.example.com/auth/callback?token_hash=verification-token&amp;type=email"'),
     }), expect.objectContaining({ idempotencyKey: expect.any(String) }));
@@ -78,5 +82,31 @@ describe("sendEmployeeActivationEmail", () => {
     await expect(sendEmployeeActivationEmail({ to: "worker@example.com", confirmationUrl }))
       .rejects.toThrow("Lien de confirmation invalide.");
     expect(resendMocks.send).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("notification reply addresses", () => {
+  beforeEach(() => { resendMocks.send.mockReset(); });
+
+  it("uses the configured reply address for payroll without an invitation", async () => {
+    resendMocks.send.mockResolvedValue({ data: { id: "payroll-id" }, error: null });
+    await sendPayslipPublishedEmail({ to: "worker@example.com", employeeName: "Worker" });
+    expect(resendMocks.send.mock.calls[0][0]).toMatchObject({
+      from: "payroll@example.com", to: "worker@example.com", replyTo: "support@example.com",
+      subject: "Nouvelle fiche de paie disponible",
+    });
+  });
+
+  it.each([false, true])("uses the configured reply address for HR mail (attachment: %s)", async (attachment) => {
+    resendMocks.send.mockResolvedValue({ data: { id: "hr-id" }, error: null });
+    await sendHrNotificationEmail({
+      to: "hr@example.com", subject: "Rapport RH", html: "<p>Rapport</p>", idempotencyKey: "hr/report/month",
+      ...(attachment ? { attachments: [{ filename: "report.csv", content: "Site,Effectif\nNord,1" }] } : {}),
+    });
+    expect(resendMocks.send.mock.calls[0][0]).toMatchObject({
+      from: "payroll@example.com", to: "hr@example.com", replyTo: "support@example.com", subject: "Rapport RH", html: "<p>Rapport</p>",
+    });
+    expect(resendMocks.send.mock.calls[0][0].attachments?.length ?? 0).toBe(attachment ? 1 : 0);
   });
 });
