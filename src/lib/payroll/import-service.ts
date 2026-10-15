@@ -1,11 +1,11 @@
-import ExcelJS from "exceljs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AgencyScopedActor } from "@/lib/admin/auth";
+import { canonicalEmployeeId } from "@/lib/employees/identity";
 import { applyColumnMappings, type ColumnMapping } from "@/lib/payroll/mapping";
 import { parsePayrollRowsFromObjects } from "@/lib/payroll/parser";
 import { PAY_ITEM_CATEGORIES, type PayItemCategory, type PayrollRowError } from "@/lib/payroll/schema";
-import { assertSafeXlsxContainer } from "@/lib/payroll/xlsx-guard";
+import { readPayrollWorkbook, PayrollWorkbookError, type PayrollWorkbook } from "@/lib/payroll/workbook-reader";
 
 export type ImportSummaryInput = {
   validRows: { employeeId: string }[];
@@ -31,8 +31,6 @@ export type PersistedPayrollImportSummary = ImportSummary & {
 type SupabaseWriteClient = Pick<SupabaseClient, "from">;
 type RawRow = Record<string, unknown>;
 
-const MAX_USEFUL_PAYROLL_ROWS = 2000;
-
 type ImportRecord = {
   id?: unknown;
 };
@@ -48,10 +46,6 @@ type EmployeeRecord = {
   email?: unknown;
   is_active?: unknown;
 };
-
-class PayrollImportParseError extends Error {}
-
-const MAX_PAYROLL_WORKSHEET_COLUMNS = 128;
 
 export function buildImportSummary(input: ImportSummaryInput): ImportSummary {
   return {
@@ -71,10 +65,10 @@ export async function persistPayrollImport(input: {
 }): Promise<PersistedPayrollImportSummary> {
   const filename = normalizedFilename(input.file.name);
 
-  let worksheetRows: RawRow[];
+  let workbook: PayrollWorkbook;
   try {
-    worksheetRows = await readPayrollWorksheetRows(input.file);
-  } catch {
+    workbook = await readPayrollWorkbook(input.file, input);
+  } catch (error) {
     const importId = await insertImportRecord(input.supabase, {
       agencyId: input.agencyId,
       filename,
@@ -87,6 +81,12 @@ export async function persistPayrollImport(input: {
       validRowCount: 0,
     });
 
+    const { error: insertError } = await input.supabase.from("payroll_import_errors").insert([{
+      import_id: importId, row_number: 1, field_name: "file", error_code: "INVALID_WORKBOOK",
+      message: error instanceof PayrollWorkbookError ? error.message : "Classeur illisible ou trop complexe. Vérifiez le format et les limites du fichier.", raw_value: null,
+    }]);
+    if (insertError) throw new Error("Impossible d’enregistrer l’erreur du classeur.");
+
     return {
       importId,
       invalidRowCount: 0,
@@ -98,12 +98,43 @@ export async function persistPayrollImport(input: {
     };
   }
 
+  const worksheetRows = workbook.rows;
+  let nativeIdentities: EmployeeRecord[] | undefined;
+  if (workbook.format !== "standard") {
+    nativeIdentities = await loadEmployeeIdentities(input.supabase, input.agencyId, worksheetRows.map((row) => ({
+      employeeId: canonicalEmployeeId(String(row.employee_id ?? "")), email: String(row.email ?? "").trim().toLowerCase(),
+    })));
+    const byId = new Map(nativeIdentities.map((employee) => [employee.employee_id, employee]));
+    for (const row of worksheetRows) {
+      const id = canonicalEmployeeId(String(row.employee_id ?? ""));
+      if (!String(row.email ?? "").trim()) row.email = byId.get(id)?.email ?? "";
+    }
+  }
   const parseResult = parsePayrollRowsFromObjects(worksheetRows);
+  for (const row of [...parseResult.validRows, ...parseResult.invalidRows]) {
+    row.rowNumber = workbook.rowNumbers[row.rowNumber - 2];
+    if (row.status === "invalid" && workbook.format !== "standard") {
+      for (const error of row.errors) {
+        if (error.fieldName === "email") error.message = "Email absent ou invalide. Créez ou complétez le dossier RH de ce matricule dans cette agence, ou ajoutez une colonne email au fichier.";
+        if (error.fieldName === "employeeId") error.message = "Matricule absent ou invalide. Complétez cette ligne dans le fichier source.";
+      }
+    }
+  }
+  parseResult.validRows = parseResult.validRows.filter((row) => {
+    const issues = workbook.issuesByRow.get(row.rowNumber);
+    if (!issues) return true;
+    parseResult.invalidRows.push({ status: "invalid", rowNumber: row.rowNumber, raw: row.data, errors: issues });
+    return false;
+  });
+  for (const row of parseResult.invalidRows) {
+    const issues = workbook.issuesByRow.get(row.rowNumber);
+    if (issues && row.errors !== issues) row.errors.push(...issues);
+  }
   const periodResult = validateRowsMatchImportPeriod(parseResult.validRows, {
     periodEnd: input.periodEnd,
     periodStart: input.periodStart,
   });
-  const identities = await loadEmployeeIdentities(input.supabase, input.agencyId, periodResult.validRows);
+  const identities = nativeIdentities ?? await loadEmployeeIdentities(input.supabase, input.agencyId, periodResult.validRows.map((row) => row.data));
   const identityResult = validateEmployeeIdentities(periodResult.validRows, identities);
   const periodValidationResult = {
     validRows: identityResult.validRows,
@@ -141,7 +172,7 @@ export async function persistPayrollImport(input: {
     import_id: importId,
     manual_adjustments: {},
     normalized_data: row.data,
-    pay_items: applyColumnMappings(row.unknownColumns, mappings),
+    pay_items: workbook.payItemsByRow.get(row.rowNumber) ?? applyColumnMappings(row.unknownColumns, mappings),
     raw_unknown_columns: row.unknownColumns,
   }));
 
@@ -180,43 +211,6 @@ export async function persistPayrollImport(input: {
     unknownEmployeeCount: unknownEmployeeIds.length,
     validRowCount: periodValidationResult.validRows.length,
   };
-}
-
-async function readPayrollWorksheetRows(file: File): Promise<RawRow[]> {
-  await assertSafeXlsxContainer(file);
-
-  const workbook = new ExcelJS.Workbook();
-  const buffer = (await file.arrayBuffer()) as Parameters<typeof workbook.xlsx.load>[0];
-  await workbook.xlsx.load(buffer);
-
-  const worksheet = workbook.getWorksheet("payroll");
-  if (!worksheet) {
-    throw new PayrollImportParseError("Worksheet payroll is required.");
-  }
-
-  const headers = readHeaderRow(worksheet);
-  if (headers.length === 0) {
-    throw new PayrollImportParseError("Payroll worksheet headers are required.");
-  }
-
-  const rows: RawRow[] = [];
-  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber === 1) return;
-
-    const rowObject = Object.fromEntries(
-      headers.map((header, index) => [header, normalizeExcelCellValue(row.getCell(index + 1).value)]),
-    );
-
-    if (Object.values(rowObject).some(hasMeaningfulCellValue)) {
-      if (rows.length >= MAX_USEFUL_PAYROLL_ROWS) {
-        throw new PayrollImportParseError("Payroll worksheet exceeds the 2000 row limit.");
-      }
-
-      rows.push(rowObject);
-    }
-  });
-
-  return rows;
 }
 
 function validateRowsMatchImportPeriod(
@@ -268,53 +262,6 @@ function validateRowsMatchImportPeriod(
   return { invalidRows, validRows };
 }
 
-function readHeaderRow(worksheet: ExcelJS.Worksheet): string[] {
-  const headerRow = worksheet.getRow(1);
-  const headers: string[] = [];
-
-  if (headerRow.cellCount > MAX_PAYROLL_WORKSHEET_COLUMNS) {
-    throw new PayrollImportParseError("Payroll worksheet exceeds the column limit.");
-  }
-
-  for (let columnIndex = 1; columnIndex <= headerRow.cellCount; columnIndex += 1) {
-    const header = normalizeExcelCellValue(headerRow.getCell(columnIndex).value);
-    headers.push(typeof header === "string" ? header.trim() : String(header).trim());
-  }
-
-  return headers.filter((header) => header.length > 0);
-}
-
-function normalizeExcelCellValue(value: ExcelJS.CellValue): unknown {
-  if (value == null) return "";
-  if (value instanceof Date) return formatExcelDate(value);
-  if (typeof value !== "object") return value;
-
-  if ("result" in value) {
-    return normalizeExcelCellValue(value.result as ExcelJS.CellValue);
-  }
-
-  if ("text" in value && typeof value.text === "string") {
-    return value.text;
-  }
-
-  if ("richText" in value && Array.isArray(value.richText)) {
-    return value.richText.map((part) => part.text).join("");
-  }
-
-  return String(value);
-}
-
-function formatExcelDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function hasMeaningfulCellValue(value: unknown): boolean {
-  return value != null && String(value).trim().length > 0;
-}
-
 async function loadColumnMappings(
   supabase: SupabaseWriteClient,
   agencyId: string,
@@ -349,16 +296,16 @@ async function loadColumnMappings(
 
 type ValidImportRow = ReturnType<typeof parsePayrollRowsFromObjects>["validRows"][number];
 
-async function loadEmployeeIdentities(supabase: SupabaseWriteClient, agencyId: string, rows: ValidImportRow[]): Promise<EmployeeRecord[]> {
+async function loadEmployeeIdentities(supabase: SupabaseWriteClient, agencyId: string, rows: { employeeId: string; email: string }[]): Promise<EmployeeRecord[]> {
   const employees: EmployeeRecord[] = [];
   for (const [column, values] of [
-    ["employee_id", rows.map((row) => row.data.employeeId)],
-    ["email", rows.map((row) => row.data.email)],
+    ["employee_id", rows.map((row) => row.employeeId)],
+    ["email", rows.map((row) => row.email)],
   ] as const) {
     const batches: string[][] = [];
     let batch: string[] = [];
     let encodedLength = 0;
-    for (const value of new Set(values)) {
+    for (const value of new Set(values.filter(Boolean))) {
       const length = encodeURIComponent(JSON.stringify(value)).length + 3;
       if (batch.length && (batch.length >= 100 || encodedLength + length > 4000)) {
         batches.push(batch); batch = []; encodedLength = 0;

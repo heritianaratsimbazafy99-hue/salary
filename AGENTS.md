@@ -2,6 +2,8 @@
 
 Application Next.js de diffusion de fiches internes issues d'une paie déjà validée. Rôles : salarié, responsable d'agence, RH, superadmin. Ne pas présenter ces fiches comme un moteur de calcul réglementaire.
 
+Formats d’import standard, Airtel et Huawei : voir `docs/operations/native-payroll-formats.md` (feuilles sources, rapprochement par matricule, rubriques et contrôles).
+
 ## Cibles vérifiées
 
 - Dépôt : `heritianaratsimbazafy99-hue/salary`, branche de production `main` protégée par PR, Quality Gate et E2E Gate.

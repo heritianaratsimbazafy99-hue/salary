@@ -74,7 +74,7 @@ export default async function ManagerImportsPage() {
           eyebrow="Espace manager"
           title="Imports de paie"
           icon={FileUp}
-          description="Chargez un fichier Excel pour une periode de paie et suivez les imports de votre agence."
+          description="Importez les fichiers Excel de paie Airtel, Huawei ou le modèle standard pour une période et suivez les imports de votre agence."
           actions={
             <Link className={buttonClasses({ variant: "secondary" })} href="/api/payroll-template" prefetch={false}>
               <FileSpreadsheet className="size-4" aria-hidden="true" />
