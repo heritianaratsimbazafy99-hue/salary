@@ -35,7 +35,8 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: localAppUrl,
-    trace: "on-first-retry",
+    // Retries are disabled: keep the first failure's navigation and network evidence.
+    trace: "retain-on-failure",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

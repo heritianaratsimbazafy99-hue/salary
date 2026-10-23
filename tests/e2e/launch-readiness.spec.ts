@@ -195,9 +195,13 @@ test("launch: HR exports and access changes apply immediately to open manager an
     await signInManager(page, fixture);
     const importId = await uploadWorkbook(page, testInfo, fixture, june, recipientRows(fixture, 1));
     await publishViaReview(page, fixture, importId);
-    const managerDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Télécharger XLSX", exact: true }).click();
-    expect((await managerDownload).suggestedFilename()).toMatch(/\.xlsx$/);
+    const [managerDownload, managerExport] = await Promise.all([
+      page.waitForEvent("download", { timeout: 15_000 }),
+      page.waitForResponse(response => new URL(response.url()).pathname === "/api/exports" && response.request().method() === "POST", { timeout: 15_000 }),
+      page.getByRole("button", { name: "Télécharger XLSX", exact: true }).click(),
+    ]);
+    expect(managerExport.status(), "Manager XLSX export HTTP status").toBe(200);
+    expect(managerDownload.suggestedFilename()).toMatch(/\.xlsx$/);
     for (const format of ["csv", "xlsx"] as const) {
       const denied = await page.request.post(appUrl("/api/exports"), { data: { agencyId: other.agencyId, exportType: "IMPORT_REPORT", format } });
       expect(denied.status()).toBe(403);
