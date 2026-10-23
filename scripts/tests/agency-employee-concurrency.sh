@@ -56,7 +56,7 @@ wait_barrier() {
   # The first session reports only after obtaining the real business locks.
   # Its transaction stays open for 3 s; the contender runs while those locks exist.
   for ((attempt=0; attempt<100; attempt++)); do
-    if rg -q '^LOCK_HELD$' "$OUT/$name.log"; then return; fi
+    if grep -q '^LOCK_HELD$' "$OUT/$name.log"; then return; fi
     if [ -f "$OUT/$name.status" ]; then cat "$OUT/$name.log" >&2; echo "FAIL: $name exited before barrier" >&2; exit 1; fi
     sleep 0.05
   done
@@ -78,7 +78,7 @@ assert_result() {
   if [ "$expected" = ok ]; then
     [ "$(cat "$OUT/$name.status")" = ok ] || { cat "$OUT/$name.log" >&2; exit 1; }
   else
-    [ "$(cat "$OUT/$name.status")" = failed ] && rg -q "ERROR:[[:space:]]+$expected:" "$OUT/$name.log" || { cat "$OUT/$name.log" >&2; echo "FAIL: $name expected SQLSTATE $expected" >&2; exit 1; }
+    [ "$(cat "$OUT/$name.status")" = failed ] && grep -Eq "ERROR:[[:space:]]+$expected:" "$OUT/$name.log" || { cat "$OUT/$name.log" >&2; echo "FAIL: $name expected SQLSTATE $expected" >&2; exit 1; }
   fi
 }
 assert_db() {

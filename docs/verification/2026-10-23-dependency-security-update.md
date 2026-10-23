@@ -31,3 +31,7 @@ Scan complémentaire des fichiers suivis et non suivis non ignorés réussi ; `g
 ## Portée
 
 Les modifications fonctionnelles des workflows déjà présentes sont conservées. Aucun commit, push, preview, déploiement ou changement de base distante. Les migrations et suites SQL restent celles vérifiées dans le [rapport fonctionnel](2026-10-23-agency-employees-implementation.md) ; elles ne sont pas modifiées par cette correction de dépendances.
+
+## Suivi de la PR
+
+Après autorisation distincte, la [PR #25](https://github.com/heritianaratsimbazafy99-hue/salary/pull/25) regroupe les workflows et ces correctifs. Le premier Quality Gate passe sous Node 22. Le premier E2E Gate révèle une dépendance de test à `rg`, absent du runner Ubuntu : les deux recherches du script de concurrence sont remplacées par `grep`, avec `-E` pour préserver la regex du SQLSTATE. Les quatre courses sont revérifiées localement avant le nouveau push. Les résultats définitifs des gates sont attachés au dernier commit dans la PR. Les previews Vercel restent désactivées ; aucune migration distante ni mise en production n’est effectuée.
