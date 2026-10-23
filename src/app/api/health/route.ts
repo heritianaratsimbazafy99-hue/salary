@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveEmailCheck } from "@/lib/health";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -61,12 +62,4 @@ function healthResponse(body: HealthBody, status: number) {
     },
     status,
   });
-}
-
-export function resolveEmailCheck(env: NodeJS.ProcessEnv = process.env): HealthBody["checks"]["email"] {
-  return hasValue(env.RESEND_API_KEY) && hasValue(env.RESEND_FROM_EMAIL) ? "configured" : "missing";
-}
-
-function hasValue(value: string | undefined) {
-  return typeof value === "string" && value.trim().length > 0;
 }

@@ -94,7 +94,7 @@ export default async function EmployeeFilePage({ params }: { params: Promise<{ e
   return <AppShell role={actor.role}><div className="flex flex-col gap-6 sm:gap-8">
     <div><Link href={`/hr/employees?agencyId=${identity.agency_id}`} className={buttonClasses({ variant: "ghost", size: "sm" })}><ArrowLeft className="size-4" aria-hidden="true" />Collaborateurs</Link></div>
     <PageHeader eyebrow={agencyName} title={identity.full_name} icon={Contact} description={`Matricule ${identity.employee_id}${entry.job_title ? ` · ${entry.job_title}` : ""}`} />
-    <Panel icon={BadgeCheck} tone="primary" title="Identité" titleId="identity" description="Synchronisée avec la paie : le nom et l’email sont mis à jour par les imports de paie, avec le même matricule."
+    <Panel icon={BadgeCheck} tone="primary" title="Identité" titleId="identity" description="Le dossier salarié fait référence pour le nom. Les fiches conservent le nom de la source de paie. Les corrections d’email nécessitent une vérification RH."
       actions={<>
         {entry.status ? <StatusBadge status={EMPLOYEE_STATUS_BADGE[entry.status]} label={EMPLOYEE_STATUS_LABEL[entry.status]} /> : <StatusBadge status="WARNING" label="Dossier à compléter" />}
         <StatusBadge status={identity.is_active ? "ACTIVE" : "INACTIVE"} label={identity.is_active ? "Accès plateforme actif" : "Accès plateforme désactivé"} />

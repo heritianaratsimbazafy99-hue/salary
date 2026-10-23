@@ -57,10 +57,12 @@ export async function resendImportInvitations(input: {
     try {
       // Use the current employee identity, never addresses from an older import.
       const { data: employee, error } = await admin.from("employees")
-        .select("employee_id,email,full_name,profile_id,is_active")
+        .select("employee_id,email,full_name,profile_id,is_active,employee_employment_lifecycle(state)")
         .eq("agency_id", agencyId).eq("employee_id", employeeId).maybeSingle();
       if (error) return { state: "failed" };
       if (!employee || employee.profile_id || employee.is_active !== true) return { state: "skipped" };
+      const lifecycle = Array.isArray(employee.employee_employment_lifecycle) ? employee.employee_employment_lifecycle[0] : employee.employee_employment_lifecycle;
+      if (lifecycle?.state === "DEPARTED") return { state: "skipped" };
       const { data: accepted, error: acceptedError } = await admin.from("employee_invitations")
         .select("id").eq("agency_id", agencyId).eq("employee_id", employeeId)
         .eq("status", "ACCEPTED").maybeSingle();

@@ -26,6 +26,7 @@ const HR_LINKS: NavLink[] = [
   { href: "/hr/leaves", label: "Congés", icon: CalendarDays },
   { href: "/hr/planning", label: "Planning", icon: CalendarRange },
   { href: "/hr/requests", label: "Demandes RH", short: "Demandes", icon: MessageSquareText },
+  { href: "/hr/agency-requests", label: "Demandes des agences", short: "Agences", icon: UsersRound },
 ];
 const PAYROLL_LINKS: NavLink[] = [
   { href: "/hr/analytics", label: "Analyses", icon: BarChart3 },
@@ -33,7 +34,7 @@ const PAYROLL_LINKS: NavLink[] = [
 ];
 
 const GROUPS_BY_ROLE: Record<AppRole, NavGroup[]> = {
-  agency_manager: [{ links: [{ href: "/manager/imports", label: "Imports", icon: FileUp }] }],
+  agency_manager: [{ links: [{ href: "/manager/employees", label: "Salariés", icon: Contact }, { href: "/manager/imports", label: "Imports de paie", short: "Paie", icon: FileUp }] }],
   employee: [{ links: [
     { href: "/employee/payslips", label: "Mes fiches", short: "Fiches", icon: FileText },
     { href: "/employee/leaves", label: "Mes congés", short: "Congés", icon: CalendarDays },

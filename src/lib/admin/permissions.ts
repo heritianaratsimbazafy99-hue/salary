@@ -85,3 +85,11 @@ export function assertCanManagePayrollForAgency(input: {
 function hasAgencyId(agencyId: string | null | undefined): agencyId is string {
   return typeof agencyId === "string" && agencyId.trim().length > 0;
 }
+
+/** Employee management is an agency capability, separate from HR referential rights. */
+export function canManageAgencyEmployees(input: { role: AppRole; actorAgencyId?: string | null; requestedAgencyId?: string | null }): boolean {
+  return input.role === "agency_manager" && hasAgencyId(input.actorAgencyId) && hasAgencyId(input.requestedAgencyId) && input.actorAgencyId === input.requestedAgencyId;
+}
+export function assertCanManageAgencyEmployees(input: Parameters<typeof canManageAgencyEmployees>[0]): void {
+  if (!canManageAgencyEmployees(input)) throw new Error(FORBIDDEN_ERROR_MESSAGE);
+}

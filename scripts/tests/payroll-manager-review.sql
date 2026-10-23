@@ -58,6 +58,7 @@ begin
  begin perform public.publish_payroll_import(i,actor,a); raise exception 'Legacy RPC reactivated employee'; exception when sqlstate 'PT409' then null; end;
  if (select is_active from public.employees where id=emp) then raise exception 'Employee reactivated'; end if;
  update public.employees set is_active=true where id=emp;
+ fingerprint := public.review_payroll_import(i)->>'fingerprint';
  select published_count into publications from public.publish_payroll_import_reviewed(i,actor,a,fingerprint);
  if publications <> 1 then raise exception 'Unexpected publication count'; end if;
  select id into slip from public.payslips where employee_id=emp;

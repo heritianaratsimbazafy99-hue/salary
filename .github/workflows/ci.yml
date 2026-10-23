@@ -86,6 +86,12 @@ jobs:
           docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-requests.sql
           docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/hr-reporting.sql
           bash scripts/tests/hr-leave-concurrency.sh
+          bash scripts/tests/agency-employee-concurrency.sh
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/agency-employee-management.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/agency-employee-imports.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/agency-payroll-invitations.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/employee-email-change.sql
+          docker exec -i supabase_db_salary-platform psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/tests/payroll-email-delivery-safety.sql
 
       - name: Run authenticated browser tests
         run: npm run test:e2e -- --project=chromium

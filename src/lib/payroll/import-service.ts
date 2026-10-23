@@ -45,6 +45,7 @@ type EmployeeRecord = {
   employee_id?: unknown;
   email?: unknown;
   is_active?: unknown;
+  employee_employment_lifecycle?: { state?: string } | { state?: string }[] | null;
 };
 
 export function buildImportSummary(input: ImportSummaryInput): ImportSummary {
@@ -315,7 +316,7 @@ async function loadEmployeeIdentities(supabase: SupabaseWriteClient, agencyId: s
     if (batch.length) batches.push(batch);
     for (const values of batches) {
       const { data, error } = await supabase.from("employees")
-        .select("employee_id,email,is_active").eq("agency_id", agencyId).in(column, values);
+        .select("employee_id,email,is_active,employee_employment_lifecycle(state)").eq("agency_id", agencyId).in(column, values);
       if (error) throw new Error("Impossible de vérifier les identités des salariés.");
       employees.push(...((data ?? []) as EmployeeRecord[]));
     }
@@ -338,9 +339,10 @@ export function validateEmployeeIdentities(rows: ValidImportRow[], employees: Em
   for (const row of rows) {
     const employee = byId.get(row.data.employeeId);
     const emailOwner = byEmail.get(row.data.email);
+    const lifecycle = Array.isArray(employee?.employee_employment_lifecycle) ? employee.employee_employment_lifecycle[0] : employee?.employee_employment_lifecycle;
     const message = (idCounts.get(row.data.employeeId) ?? 0) > 1 ? "Matricule présent plusieurs fois dans le fichier. Conservez une seule ligne par salarié."
       : (emailCounts.get(row.data.email) ?? 0) > 1 ? "Email présent sur plusieurs lignes. Vérifiez les identités des salariés."
-      : employee?.is_active === false ? "Salarié désactivé. Une réactivation RH est nécessaire avant un nouvel import."
+      : employee?.is_active === false && lifecycle?.state !== "DEPARTED" ? "Salarié désactivé. Une réactivation RH est nécessaire avant un nouvel import."
       : employee && typeof employee.email === "string" && employee.email.toLowerCase() !== row.data.email ? "Cet email diffère du dossier salarié. Faites vérifier son identité avant de réimporter."
       : emailOwner && emailOwner.employee_id !== row.data.employeeId ? "Cet email appartient à un autre matricule de l’agence. Vérifiez le matricule avant de réimporter."
       : null;

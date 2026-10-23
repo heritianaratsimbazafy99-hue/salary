@@ -149,6 +149,18 @@ export async function publishPayrollImport(input: {
   };
 }
 
+/** Live database/Auth proof; RPC errors fail closed without changing payroll. */
+export async function isPayrollEmailDeliveryAllowed(
+  client: Pick<SupabaseClient, "rpc">,
+  agencyId: string,
+  recipientEmail: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await client.rpc("payroll_email_delivery_allowed", { p_agency_id: agencyId, p_email: recipientEmail });
+    return !error && data === true;
+  } catch { return false; }
+}
+
 async function sendPayslipPublishedNotifications(input: {
   agencyId: string;
   provisionedEmployees: ProvisionedEmployeeAuthProfile[];
@@ -166,10 +178,15 @@ async function sendPayslipPublishedNotifications(input: {
   let sent = 0;
   let failed = 0;
 
-  const deliverable = notifications.flatMap((notification) => {
-    const employee = employeesByEmail.get(notification.recipientEmail.toLowerCase());
-    return employee ? [{ notification, employee }] : [];
-  });
+  const deliverable: Array<{ notification: (typeof notifications)[number]; employee: ProvisionedEmployeeAuthProfile }> = [];
+  for (let offset = 0; offset < notifications.length; offset += 8) {
+    const batch = await Promise.all(notifications.slice(offset, offset + 8).map(async (notification) => {
+      const employee = employeesByEmail.get(notification.recipientEmail.toLowerCase());
+      if (!employee || !await isPayrollEmailDeliveryAllowed(input.supabase, input.agencyId, notification.recipientEmail)) return null;
+      return { notification, employee };
+    }));
+    for (const item of batch) if (item) deliverable.push(item);
+  }
   const messages = deliverable.map(({ notification, employee }) => ({
     employeeName: employee.fullName,
     ...(employee.invitationToken ? { invitationToken: employee.invitationToken } : {}),

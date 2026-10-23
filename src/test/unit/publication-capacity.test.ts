@@ -32,7 +32,11 @@ describe("publication capacity", () => {
         update: (value: Record<string, unknown>) => { update = value; return query; },
         then: (resolve: (value: unknown) => unknown) => { if (update) rows.forEach((row) => Object.assign(row, update)); return Promise.resolve({ error: null }).then(resolve); },
       }; return query;
-    }, rpc: async () => ({ data: [{ agency_id: "agency", import_id: "import", period_start: "2026-10-01", period_end: "2026-10-31", published_count: 340, status: "PUBLISHED" }], error: null }) };
+    }, rpc: async (name: string) => {
+      if (name === "payroll_email_delivery_allowed") return { data: true, error: null };
+      if (name === "publish_payroll_import_reviewed") return { data: [{ agency_id: "agency", import_id: "import", period_start: "2026-10-01", period_end: "2026-10-31", published_count: 340, status: "PUBLISHED" }], error: null };
+      throw new Error(`Unexpected RPC: ${name}`);
+    } };
     const result = await publishPayrollImport({ actor: { id: "actor", role: "agency_manager", agencyId: "agency" }, fingerprint: "fingerprint", importId: "import", readSupabase: client, createWriteSupabase: () => client } as unknown as Parameters<typeof publishPayrollImport>[0]);
     expect(maxActive).toBe(8); expect(active).toBe(0);
     expect(result).toMatchObject({ emailSentCount: 339, emailFailedCount: 1, notificationCount: 340 });

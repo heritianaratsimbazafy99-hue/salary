@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ send: vi.fn(), load: vi.fn(), markSent: vi.fn(), markFailed: vi.fn() }));
+const mocks = vi.hoisted(() => ({ send: vi.fn(), load: vi.fn(), markSent: vi.fn(), markFailed: vi.fn(), deliveryAllowed: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/payroll/publish", () => ({
-  loadPublishedPayslipNotifications: mocks.load, markNotificationSent: mocks.markSent, markNotificationFailed: mocks.markFailed,
+  isPayrollEmailDeliveryAllowed: mocks.deliveryAllowed, loadPublishedPayslipNotifications: mocks.load, markNotificationSent: mocks.markSent, markNotificationFailed: mocks.markFailed,
   PublishConflictError: class extends Error {}, PublishNotFoundError: class extends Error {},
 }));
 vi.mock("@/lib/notifications/resend-server", () => ({
@@ -33,7 +33,7 @@ function fixture(count = 1) {
   return { input, rows, notifications, createWriteSupabase };
 }
 
-beforeEach(() => { vi.resetAllMocks(); mocks.send.mockResolvedValue({ data: { id: "provider" }, error: null }); });
+beforeEach(() => { vi.resetAllMocks(); mocks.deliveryAllowed.mockResolvedValue(true); mocks.send.mockResolvedValue({ data: { id: "provider" }, error: null }); });
 describe("safe manual notification recovery", () => {
   it("retries twenty definite failures, then only remaining records, without resending SENT notifications", async () => {
     const { input } = fixture(25);
@@ -42,6 +42,13 @@ describe("safe manual notification recovery", () => {
     expect(await retryImportNotifications(input)).toMatchObject({ sent: 0, remaining: 0 });
     expect(mocks.send).toHaveBeenCalledTimes(25);
     expect(mocks.send.mock.calls[0][0].idempotencyKey).toBe("notification-retry/notification-0");
+  });
+  it("leaves the failed notification recoverable when Auth proof has moved to a new mailbox", async () => {
+    const { input } = fixture(); mocks.deliveryAllowed.mockResolvedValue(false);
+    expect(await retryImportNotifications(input)).toMatchObject({ sent: 0, failed: 1 });
+    expect(mocks.send).not.toHaveBeenCalled();
+    mocks.deliveryAllowed.mockResolvedValue(true);
+    expect(await retryImportNotifications(input)).toMatchObject({ sent: 1, failed: 0 });
   });
   it.each(["deliveryUnconfirmed", "pending"] as const)("never blindly retries %s delivery", async (state) => {
     const { input, notifications } = fixture(); notifications[0][state] = true;
