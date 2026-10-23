@@ -78,10 +78,16 @@ test("unactivated employee confirms delivered dedicated proof explicitly without
       expect((await fixture.admin.from("employees").select("email").eq("id", employeeId).single()).data?.email).toBe(fixture.employeeEmail);
       // A scanner GET does not consume the proof; a modified bearer cannot confirm.
       const invalid = new URL(link); invalid.hash = new URLSearchParams({ request: requestId, token: "b".repeat(43) }).toString();
-      await confirmPage.goto(invalid.toString());
-      await confirmPage.getByRole("button", { name: "Confirmer ma nouvelle adresse" }).click();
-      await expect(confirmPage.getByRole("status")).toContainText("invalide ou expiré");
-      await confirmPage.goto(link);
+      // Isolate the invalid proof from the scanner's already-open valid fragment.
+      const invalidPage = await recipient.newPage();
+      await invalidPage.goto(invalid.toString());
+      await expect.poll(() => invalidPage.evaluate(() => new URLSearchParams(location.hash.slice(1)).get("token"))).toBe("b".repeat(43));
+      const invalidSubmission = invalidPage.waitForRequest(request => request.method() === "POST" && new URL(request.url()).pathname === "/auth/email-change");
+      await invalidPage.getByRole("button", { name: "Confirmer ma nouvelle adresse" }).click();
+      expect((await invalidSubmission).postData()).toContain("b".repeat(43));
+      await expect(invalidPage.getByRole("status")).toContainText("invalide ou expiré");
+      expect((await fixture.admin.from("employees").select("email").eq("id", employeeId).single()).data?.email).toBe(fixture.employeeEmail);
+      await invalidPage.close();
       await confirmPage.getByRole("button", { name: "Confirmer ma nouvelle adresse" }).click();
       await expect(confirmPage.getByRole("status")).toContainText("Nouvelle adresse vérifiée");
       expect((await fixture.admin.from("employees").select("email,profile_id").eq("id", employeeId).single()).data).toEqual({ email: newEmail, profile_id: null });

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { FileSpreadsheet, FileText, Loader2, Sheet } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ExportType } from "@/lib/payroll/export";
 
 const FORMAT_ICON = { csv: Sheet, xlsx: FileSpreadsheet, pdf: FileText } as const;
 const FORMAT_TONE = { csv: "text-teal", xlsx: "text-success", pdf: "text-danger" } as const;
+const subscribe = () => () => {};
 
 type Props = {
   agencyId?: string;
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function ExportDownload({ agencyId, importId, exportType = "IMPORT_REPORT", periodStart, periodEnd, allowPdf = false }: Props) {
+  const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -53,7 +55,7 @@ export function ExportDownload({ agencyId, importId, exportType = "IMPORT_REPORT
       <div className="flex flex-wrap gap-2">
         {formats.map((format) => {
           const Icon = FORMAT_ICON[format];
-          return <Button key={format} variant="secondary" disabled={pending !== null} onClick={() => void download(format)}>{pending === format ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Icon className={`size-4 ${FORMAT_TONE[format]}`} aria-hidden="true" />}{pending === format ? "Préparation…" : `Télécharger ${format.toUpperCase()}`}</Button>;
+          return <Button key={format} variant="secondary" disabled={!hydrated || pending !== null} onClick={() => void download(format)}>{pending === format ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Icon className={`size-4 ${FORMAT_TONE[format]}`} aria-hidden="true" />}{pending === format ? "Préparation…" : `Télécharger ${format.toUpperCase()}`}</Button>;
         })}
       </div>
       {error ? <p role="alert" className="rounded-xl bg-danger/[0.06] px-3 py-2 text-sm text-danger">{error}</p> : null}
