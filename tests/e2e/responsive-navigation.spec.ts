@@ -74,7 +74,7 @@ for (const role of ["hr", "superAdmin"] as const) {
           const panel = nav.locator("#nav-more");
           await expect(panel.getByRole("link").first()).toBeFocused();
           const expectedPaths = [
-            "/hr/requests", "/hr/analytics", "/hr/exports", "/hr/agencies", "/hr/organisation", "/hr/users",
+            "/hr/requests", "/hr/agency-requests", "/hr/analytics", "/hr/exports", "/hr/agencies", "/hr/organisation", "/hr/users",
             ...(role === "superAdmin" ? ["/hr/access"] : []),
             "/hr/audit", ...(role === "superAdmin" ? ["/hr/operations"] : []), "/help",
           ];

@@ -41,7 +41,7 @@ describe("EmployeePayslipsPage", () => {
 
     const { default: EmployeePayslipsPage } = await import("@/app/employee/payslips/page");
 
-    await expect(Promise.resolve().then(() => EmployeePayslipsPage())).rejects.toThrow(
+    await expect(Promise.resolve().then(() => EmployeePayslipsPage({}))).rejects.toThrow(
       "NEXT_REDIRECT:/auth/login",
     );
     expect(employeePayslipsMocks.redirect).toHaveBeenCalledWith("/auth/login");
@@ -80,7 +80,7 @@ describe("EmployeePayslipsPage", () => {
 
     const { default: EmployeePayslipsPage } = await import("@/app/employee/payslips/page");
 
-    render(await EmployeePayslipsPage());
+    render(await EmployeePayslipsPage({}));
 
     expect(client.from).toHaveBeenCalledWith("payslips");
     expect(client.payslipsQuery.eq).toHaveBeenCalledWith("employee.profile_id", PROFILE_ID);
@@ -103,7 +103,7 @@ describe("EmployeePayslipsPage", () => {
 
     const { default: EmployeePayslipsPage } = await import("@/app/employee/payslips/page");
 
-    render(await EmployeePayslipsPage());
+    render(await EmployeePayslipsPage({}));
 
     expect(screen.getByRole("heading", { name: "Acces refuse" })).toBeTruthy();
     expect(client.from).not.toHaveBeenCalledWith("payslips");
@@ -144,7 +144,7 @@ describe("EmployeePayslipsPage", () => {
       claimsSub: "auth-id", profile: { id: PROFILE_ID, role: "employee" }, payslipRows: [foreignRow],
     }));
     const { default: Page } = await import("@/app/employee/payslips/page");
-    render(await Page());
+    render(await Page({}));
     expect(screen.getByRole("heading", { name: "Acces refuse" })).toBeTruthy();
     expect(screen.queryByText("Foreign allowance")).toBeNull();
   });

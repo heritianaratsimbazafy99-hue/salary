@@ -18,6 +18,6 @@ export const ManualCorrectionSchema = z.object({
 
 export const PublicationReviewSchema = z.object({
   fingerprint: z.string().regex(/^[a-f0-9]{32}$/),
-  recipients: z.array(z.object({ employeeId: z.string(), employeeName: z.string(), email: z.email() })),
+  recipients: z.array(z.object({ employeeId: z.string(), employeeName: z.string(), email: z.email(), departed: z.boolean().optional(), nameDiffers: z.boolean().optional() })),
 });
 export type PublicationReview = z.infer<typeof PublicationReviewSchema>;

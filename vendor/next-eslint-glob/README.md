@@ -22,7 +22,7 @@ This repository does not configure a custom `settings.next.rootDir`.
 
 The root development dependency names this package `fast-glob` through a local
 `file:./vendor/next-eslint-glob` reference. The override is scoped to
-`@next/eslint-plugin-next@16.3.8` and refers to that root dependency with
+`@next/eslint-plugin-next@16.4.2` and refers to that root dependency with
 `$fast-glob`. A clean `npm ci`, `npm ls --all`, and the installed-dependency
 identity assertion in the regression test verify this installation contract.
 Recheck the override if the plugin version or dependency layout changes.

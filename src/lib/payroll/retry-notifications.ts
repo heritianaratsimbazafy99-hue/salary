@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgencyScopedActor } from "@/lib/admin/auth";
 import { assertCanManagePayrollForAgency } from "@/lib/admin/permissions";
 import { EMAIL_DELIVERY_UNCONFIRMED, EmailDeliveryError, sendPayslipPublishedEmail } from "@/lib/notifications/resend-server";
-import { loadPublishedPayslipNotifications, markNotificationFailed, markNotificationSent, PublishConflictError, PublishNotFoundError } from "@/lib/payroll/publish";
+import { isPayrollEmailDeliveryAllowed, loadPublishedPayslipNotifications, markNotificationFailed, markNotificationSent, PublishConflictError, PublishNotFoundError } from "@/lib/payroll/publish";
 
 /** Retry only definite failures for active accounts; invitation recovery has its own action. */
 export async function retryImportNotifications(input: {
@@ -43,6 +43,7 @@ export async function retryImportNotifications(input: {
       .eq("id", employee.profile_id).maybeSingle();
     if (profileError) { result.failed += 1; continue; }
     if (!profile?.is_active || profile.role !== "employee") { result.skipped += 1; continue; }
+    if (!await isPayrollEmailDeliveryAllowed(admin, input.actor.agencyId, notification.recipientEmail)) { result.failed += 1; continue; }
     attempted += 1;
     let providerAccepted = false;
     try {

@@ -20,7 +20,7 @@ function roleLinks(role: AppRole) {
 
 describe("RoleNav", () => {
   it("uses route-plan hrefs for each application role", () => {
-    expect(roleLinks("agency_manager")).toEqual([{ href: "/manager/imports", label: "Imports" }, { href: "/help", label: "Guide" }]);
+    expect(roleLinks("agency_manager")).toEqual([{ href: "/manager/employees", label: "Salariés" }, { href: "/manager/imports", label: "Imports de paie" }, { href: "/help", label: "Guide" }]);
 
     expect(roleLinks("employee")).toEqual([{ href: "/employee/payslips", label: "Mes fiches" }, { href: "/employee/leaves", label: "Mes congés" }, { href: "/employee/requests", label: "Demandes" }, { href: "/employee/profile", label: "Mon dossier" }, { href: "/help", label: "Guide" }]);
 
@@ -30,6 +30,7 @@ describe("RoleNav", () => {
       { href: "/hr/leaves", label: "Congés" },
       { href: "/hr/planning", label: "Planning" },
       { href: "/hr/requests", label: "Demandes RH" },
+      { href: "/hr/agency-requests", label: "Demandes des agences" },
       { href: "/hr/analytics", label: "Analyses" },
       { href: "/hr/exports", label: "Exports" },
     ];

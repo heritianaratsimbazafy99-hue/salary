@@ -28,7 +28,7 @@ export default async function EmployeeProfilePage() {
     if (error instanceof Error && error.message === FORBIDDEN_ERROR_MESSAGE) return <AccessDenied context="Espace salarié" />;
     throw error;
   }
-  return <AppShell role="employee"><div className="flex flex-col gap-6 sm:gap-8">
+  return <AppShell role="employee"><div className="flex flex-col gap-6 sm:gap-8"><Link href="/employee/email-change" className="inline-flex min-h-11 items-center font-semibold text-primary underline">Vérifier mon email de connexion</Link>
     <PageHeader eyebrow="Espace salarié" title="Mon dossier" icon={IdCard} description="Les informations de votre dossier RH. Pour toute correction, contactez le service RH." />
     {!files.length ? <EmptyState icon={IdCard} title="Aucun dossier disponible." description="Votre dossier RH n’a pas encore été créé." /> : null}
     {files.map(({ entry, privateDetails }) => <div key={entry.employee_id} className="grid min-w-0 gap-6">

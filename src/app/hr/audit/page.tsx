@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AuditPage({ searchParams }: { searchParams?: Promise<{ domain?: string }> } = {}) {
+export default async function AuditPage({ searchParams }: { searchParams?: Promise<{ domain?: string }> }) {
   let actor: Awaited<ReturnType<typeof requireCanReadPayrollAnalytics>>;
 
   try {

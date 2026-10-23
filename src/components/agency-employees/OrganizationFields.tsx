@@ -1,0 +1,10 @@
+"use client";
+import { useState } from "react";
+import type { AgencyEmployee, AgencyOptions } from "@/lib/employees/agency-management";
+import { fieldClass, labelClass } from "@/components/ui/Input";
+export function OrganizationFields({ employee, options }: { employee: AgencyEmployee; options: AgencyOptions }) {
+  const [siteId, setSiteId] = useState(employee.site_id ?? ""); const [teamId, setTeamId] = useState(employee.team_id ?? "");
+  return <><div className="grid gap-2"><label htmlFor="departmentId" className={labelClass}>Département</label><select id="departmentId" name="departmentId" className={fieldClass} defaultValue={employee.department_id ?? ""}><option value="">À compléter</option>{employee.department_id && !options.departments.some((d) => d.id === employee.department_id) ? <option value={employee.department_id} disabled>Référence inactive — choisir une valeur active</option> : null}{options.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+  <div className="grid gap-2"><label htmlFor="siteId" className={labelClass}>Site</label><select id="siteId" name="siteId" className={fieldClass} value={siteId} onChange={(event) => { setSiteId(event.target.value); setTeamId(""); }}><option value="">À compléter</option>{employee.site_id && !options.sites.some((s) => s.id === employee.site_id) ? <option value={employee.site_id} disabled>Référence inactive — choisir une valeur active</option> : null}{options.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+  <div className="grid gap-2"><label htmlFor="teamId" className={labelClass}>Équipe</label><select id="teamId" name="teamId" className={fieldClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}><option value="">Sans équipe</option>{employee.team_id && !options.teams.some((t) => t.id === employee.team_id) ? <option value={employee.team_id} disabled>Référence inactive — choisir une valeur active</option> : null}{options.teams.filter((t) => t.site_id === siteId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div></>;
+}

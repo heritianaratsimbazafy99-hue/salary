@@ -36,6 +36,7 @@ begin
  begin perform public.publish_payroll_import_reviewed(i,actor,a,fingerprint); raise exception 'disabled case variant published'; exception when sqlstate 'PT409' then null; end;
  begin insert into public.employees(agency_id,employee_id,email,full_name) values(a,'ab-001','bypass@example.test','Bypass'); raise exception 'disabled case variant duplicated'; exception when unique_violation then null; end;
  update public.employees set is_active=true where id=emp;
+ fingerprint := public.review_payroll_import(i)->>'fingerprint';
  perform public.publish_payroll_import_reviewed(i,actor,a,fingerprint);
  if (select count(*) from public.employees where agency_id=a) <> 1 then raise exception 'duplicate employee after publication'; end if;
  if not exists(select 1 from public.payslips where employee_id=emp and agency_id=a) then raise exception 'publication lost employee UUID'; end if;

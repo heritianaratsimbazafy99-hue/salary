@@ -94,6 +94,22 @@ describe("ensureEmployeeAuthProfile", () => {
     expect(JSON.stringify(payload)).not.toContain(result.invitationToken);
   });
 
+  it("preserves the dossier name when payroll contains a different historical name", async () => {
+    const client = createEmployeeProvisioningClient({ existingEmployee: { employee_id: "EMP-001", email: "worker@example.com", full_name: "Corrected Dossier Name", is_active: true, profile_id: "00000000-0000-0000-0000-000000000201" } });
+    const { ensureEmployeeAuthProfile } = await import("@/lib/employees/linking");
+    const result = await ensureEmployeeAuthProfile({ agencyId: AGENCY_ID, employeeId: "EMP-001", email: "worker@example.com", fullName: "Historical Payroll Name", invitedByProfileId: INVITED_BY_PROFILE_ID }, client as unknown as Parameters<typeof ensureEmployeeAuthProfile>[1]);
+    expect(result.fullName).toBe("Corrected Dossier Name");
+    expect(tableWithUpdate(client, "employees").update).toHaveBeenCalledWith({ profile_id: "00000000-0000-0000-0000-000000000201" });
+  });
+
+  it("does not create an activation invitation for a departed employee", async () => {
+    const client = createEmployeeProvisioningClient({ existingEmployee: { employee_id: "EMP-001", email: "worker@example.com", full_name: "Worker One", is_active: true, profile_id: null, employee_employment_lifecycle: { state: "DEPARTED" } } });
+    const { ensureEmployeeAuthProfile } = await import("@/lib/employees/linking");
+    const result = await ensureEmployeeAuthProfile({ agencyId: AGENCY_ID, employeeId: "EMP-001", email: "worker@example.com", fullName: "Worker One", invitedByProfileId: INVITED_BY_PROFILE_ID }, client as unknown as Parameters<typeof ensureEmployeeAuthProfile>[1]);
+    expect(result.invitationToken).toBeUndefined();
+    expect(tableWithUpsert(client, "employee_invitations").upsert).not.toHaveBeenCalled();
+  });
+
   it("does not bind an existing employee profile by email during publication", async () => {
     const client = createEmployeeProvisioningClientWithExistingProfile({
       authUserId: "00000000-0000-0000-0000-000000000301",
@@ -334,7 +350,6 @@ describe("linkEmployeeAuthProfile", () => {
     ]);
     expect(client.employeeUpdate).toHaveBeenCalledWith({
       email: "employee@example.com",
-      full_name: "Rina Salary",
       profile_id: "00000000-0000-0000-0000-000000000201",
     });
     expect(client.employeeEq).toHaveBeenCalledWith(

@@ -26,7 +26,7 @@ export default async function EmployeePayslipsPage({
   searchParams,
 }: {
   searchParams?: Promise<{ payslip?: string | string[] }>;
-} = {}) {
+}) {
   const supabase = await createClient();
   let payslips: Awaited<ReturnType<typeof loadEmployeePayslips>>;
 

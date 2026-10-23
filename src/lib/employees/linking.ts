@@ -59,6 +59,7 @@ type EmployeeRecord = {
   employee_id?: unknown;
   full_name?: unknown;
   is_active?: unknown;
+  employee_employment_lifecycle?: { state?: string } | { state?: string }[] | null;
   profile_id?: unknown;
 };
 
@@ -67,6 +68,7 @@ type ExistingEmployeeRecord = {
   employeeId: string;
   fullName: string;
   isActive: boolean;
+  departed: boolean;
   profileId: string | null;
 };
 
@@ -154,7 +156,6 @@ export async function linkEmployeeAuthProfile(
     .from("employees")
     .update({
       email: identity.email,
-      full_name: identity.fullName,
       profile_id: profileId,
     })
     .eq("agency_id", identity.agencyId)
@@ -167,8 +168,7 @@ export async function linkEmployeeAuthProfile(
     employeeError ||
     employee?.profile_id !== profileId ||
     employee.employee_id !== identity.employeeId ||
-    employee.email !== identity.email ||
-    employee.full_name !== identity.fullName
+    employee.email !== identity.email
   ) {
     await admin.from("profiles").delete().eq("id", profileId);
     await admin.auth.admin.deleteUser(authUserId);
@@ -194,12 +194,13 @@ export async function ensureEmployeeAuthProfile(
     throw new Error("Champs invalides.");
   }
 
-  const identity = normalizeEmployeeIdentity(parsedInput.data);
+  let identity = normalizeEmployeeIdentity(parsedInput.data);
   const previousEmployee = await findExistingEmployee(admin, identity);
   if (previousEmployee?.isActive === false) throw new Error("Ce salarié est désactivé. Une réactivation RH est nécessaire.");
   if (previousEmployee && previousEmployee.email.toLowerCase() !== identity.email) {
     throw new Error("L’email diffère du dossier salarié. Faites vérifier son identité avant de publier.");
   }
+  if (previousEmployee) identity = { ...identity, fullName: previousEmployee.fullName };
   const profileId = previousEmployee?.profileId ?? null;
   const employeeRollback = {
     identity,
@@ -214,7 +215,7 @@ export async function ensureEmployeeAuthProfile(
 
   let invitation: Awaited<ReturnType<typeof upsertPendingEmployeeInvitation>> | null = null;
 
-  if (!profileId) {
+  if (!profileId && !previousEmployee?.departed) {
     try {
       invitation = await upsertPendingEmployeeInvitation(admin, {
         identity,
@@ -308,7 +309,7 @@ async function findExistingEmployee(
 ): Promise<ExistingEmployeeRecord | null> {
   const { data, error } = await admin
     .from("employees")
-    .select("employee_id,email,full_name,is_active,profile_id")
+    .select("employee_id,email,full_name,is_active,profile_id,employee_employment_lifecycle(state)")
     .eq("agency_id", identity.agencyId)
     .eq("employee_id", identity.employeeId)
     .maybeSingle();
@@ -336,6 +337,7 @@ async function findExistingEmployee(
     employeeId: employee.employee_id,
     fullName: employee.full_name,
     isActive: employee.is_active,
+    departed: (Array.isArray(employee.employee_employment_lifecycle) ? employee.employee_employment_lifecycle[0] : employee.employee_employment_lifecycle)?.state === "DEPARTED",
     profileId: typeof employee.profile_id === "string" ? employee.profile_id : null,
   };
 }
@@ -354,7 +356,7 @@ async function upsertPublicationEmployee(
   // Do not overwrite activation or deactivation that happened after the read.
   let mutation;
   if (input.exists) {
-    const query = admin.from("employees").update(payload)
+    const query = admin.from("employees").update({ profile_id: input.profileId })
       .eq("agency_id", input.identity.agencyId).eq("employee_id", input.identity.employeeId)
       .eq("is_active", true).eq("email", input.identity.email);
     mutation = input.profileId ? query.eq("profile_id", input.profileId) : query.is("profile_id", null);

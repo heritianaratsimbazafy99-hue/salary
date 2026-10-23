@@ -317,7 +317,7 @@ function createAdminPublishClient(db: PublishTestDb) {
       },
     },
     from: vi.fn((table: keyof PublishTestDb) => createTableQuery(db, table)),
-    rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({
+    rpc: vi.fn(async (name = "publish_payroll_import_reviewed"): Promise<{ data: unknown; error: unknown }> => name === "payroll_email_delivery_allowed" ? { data: true, error: null } : ({
       data: [
         {
           agency_id: AGENCY_ID,

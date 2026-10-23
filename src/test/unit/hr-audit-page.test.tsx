@@ -39,7 +39,7 @@ describe("AuditPage", () => {
 
     const { default: AuditPage } = await import("@/app/hr/audit/page");
 
-    await expect(Promise.resolve().then(() => AuditPage())).rejects.toThrow(
+    await expect(Promise.resolve().then(() => AuditPage({}))).rejects.toThrow(
       "NEXT_REDIRECT:/auth/login",
     );
     expect(auditPageMocks.redirect).toHaveBeenCalledWith("/auth/login");
@@ -53,7 +53,7 @@ describe("AuditPage", () => {
 
     const { default: AuditPage } = await import("@/app/hr/audit/page");
 
-    render(await AuditPage());
+    render(await AuditPage({}));
 
     expect(screen.getByRole("heading", { name: "Acces refuse" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Journal d'audit" })).toBeNull();
@@ -78,7 +78,7 @@ describe("AuditPage", () => {
 
     const { default: AuditPage } = await import("@/app/hr/audit/page");
 
-    render(await AuditPage());
+    render(await AuditPage({}));
 
     expect(client.from).toHaveBeenCalledWith("audit_logs");
     expect(client.query.select).toHaveBeenCalledWith(
