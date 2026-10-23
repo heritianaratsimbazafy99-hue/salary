@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const provider = vi.hoisted(() => ({ send: vi.fn(), batch: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("resend", () => ({ Resend: class { emails = { send: provider.send }; batch = { send: provider.batch }; } }));
-vi.mock("@/lib/env.server", () => ({ serverEnv: { RESEND_API_KEY: "test-key", RESEND_FROM_EMAIL: "payroll@example.com" } }));
+vi.mock("@/lib/env.server", () => ({ serverEnv: { RESEND_API_KEY: "test-key", RESEND_FROM_EMAIL: "payroll@example.com", RESEND_REPLY_TO_EMAIL: "support@example.com" } }));
 vi.mock("@/lib/env.public", () => ({ publicEnv: { NEXT_PUBLIC_APP_URL: "https://salary.example.com" } }));
 
 import * as mailer from "@/lib/notifications/resend-server";
@@ -56,6 +56,8 @@ describe("email capacity and delivery recovery", () => {
     const messages = provider.batch.mock.calls.flatMap((call) => call[0]);
     messages.forEach((message, index) => {
       expect(message.to).toBe(`worker${index}@example.com`);
+      expect(message.from).toBe("payroll@example.com");
+      expect(message.replyTo).toBe("support@example.com");
       expect(message.html).toContain(`token=private-token-${index}\"`);
       expect(message.cc).toBeUndefined(); expect(message.bcc).toBeUndefined();
     });
